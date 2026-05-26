@@ -1,5 +1,6 @@
 package com.raju.edutrack.screens
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -10,19 +11,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.raju.edutrack.Contact
 import com.raju.edutrack.Student
 import com.raju.edutrack.StudentManager
+import com.raju.edutrack.formatDate
+import com.raju.edutrack.parseDateOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +54,14 @@ fun StudentsScreen() {
         mutableStateOf(false)
     }
 
+    var showEditDialog by remember {
+        mutableStateOf(false)
+    }
+
+    val selectedStudentIndexes = remember {
+        mutableStateListOf<Int>()
+    }
+
     var studentName by remember {
         mutableStateOf("")
     }
@@ -61,6 +76,10 @@ fun StudentsScreen() {
 
     var schoolName by remember {
         mutableStateOf("")
+    }
+
+    var joinDateText by remember {
+        mutableStateOf(formatDate(System.currentTimeMillis()))
     }
 
     val contactEntries = remember {
@@ -85,22 +104,64 @@ fun StudentsScreen() {
         "4th Year"
     )
 
-    val students = StudentManager.students.filter {
+    fun resetForm() {
+        studentName = ""
+        className = ""
+        schoolName = ""
+        joinDateText =
+            formatDate(System.currentTimeMillis())
+        contactEntries.clear()
+        contactEntries.add(
+            ContactEntry(
+                label = "Primary",
+                number = ""
+            )
+        )
+    }
+
+    fun loadForm(student: Student) {
+        studentName = student.studentName
+        className = student.className
+        schoolName = student.schoolName
+        joinDateText = formatDate(student.joinDateMillis)
+        contactEntries.clear()
+        if (student.contacts.isEmpty()) {
+            contactEntries.add(
+                ContactEntry(
+                    label = "Primary",
+                    number = ""
+                )
+            )
+        } else {
+            contactEntries.addAll(
+                student.contacts.map { contact ->
+                    ContactEntry(
+                        label = contact.label,
+                        number = contact.number
+                    )
+                }
+            )
+        }
+    }
+
+    val studentsWithIndex = StudentManager.students
+        .withIndex()
+        .filter { entry ->
 
         normalizedSearch.isEmpty() ||
-            it.studentName.contains(
+            entry.value.studentName.contains(
                 normalizedSearch,
                 ignoreCase = true
             ) ||
-            it.className.contains(
+            entry.value.className.contains(
                 normalizedSearch,
                 ignoreCase = true
             ) ||
-            it.schoolName.contains(
+            entry.value.schoolName.contains(
                 normalizedSearch,
                 ignoreCase = true
             ) ||
-            it.contacts.any { contactEntry ->
+            entry.value.contacts.any { contactEntry ->
                 contactEntry.number.contains(
                     normalizedSearch,
                     ignoreCase = true
@@ -108,13 +169,14 @@ fun StudentsScreen() {
             }
     }
 
-    if (showDialog) {
+    if (showDialog || showEditDialog) {
 
         AlertDialog(
 
             onDismissRequest = {
 
                 showDialog = false
+                showEditDialog = false
 
             },
 
@@ -135,39 +197,71 @@ fun StudentsScreen() {
                                 entry.number.isNotBlank()
                             }
 
-                        StudentManager.students.add(
+                        val joinDateMillis =
+                            parseDateOrNull(joinDateText)
+                                ?: System.currentTimeMillis()
 
-                            Student(
+                        if (showEditDialog) {
 
-                                studentName = studentName.trim(),
+                            val index =
+                                selectedStudentIndexes.firstOrNull()
+                            if (index != null &&
+                                index < StudentManager.students.size
+                            ) {
+                                val existing =
+                                    StudentManager.students[index]
+                                StudentManager.students[index] =
+                                    existing.copy(
+                                        studentName =
+                                            studentName.trim(),
+                                        className =
+                                            className.trim(),
+                                        schoolName =
+                                            schoolName.trim(),
+                                        contacts = contacts,
+                                        joinDateMillis =
+                                            joinDateMillis
+                                    )
+                            }
 
-                                className = className.trim(),
+                        } else {
 
-                                schoolName = schoolName.trim(),
+                            StudentManager.students.add(
 
-                                contacts = contacts
+                                Student(
 
+                                    studentName =
+                                        studentName.trim(),
+
+                                    className =
+                                        className.trim(),
+
+                                    schoolName =
+                                        schoolName.trim(),
+
+                                    contacts = contacts,
+
+                                    joinDateMillis =
+                                        joinDateMillis,
+
+                                    lastFeePaidMillis = null
+
+                                )
                             )
-                        )
 
-                        studentName = ""
-                        className = ""
-                        schoolName = ""
-                        contactEntries.clear()
-                        contactEntries.add(
-                            ContactEntry(
-                                label = "Primary",
-                                number = ""
-                            )
-                        )
+                        }
+
+                        resetForm()
 
                         showDialog = false
+                        showEditDialog = false
+                        selectedStudentIndexes.clear()
 
                     }
 
                 ) {
 
-                    Text("Save")
+                    Text(if (showEditDialog) "Update" else "Save")
 
                 }
             },
@@ -179,6 +273,8 @@ fun StudentsScreen() {
                     onClick = {
 
                         showDialog = false
+                        showEditDialog = false
+                        selectedStudentIndexes.clear()
 
                     }
 
@@ -191,7 +287,7 @@ fun StudentsScreen() {
 
             title = {
 
-                Text("Add Student")
+                Text(if (showEditDialog) "Edit Student" else "Add Student")
 
             },
 
@@ -330,6 +426,30 @@ fun StudentsScreen() {
                         modifier = Modifier.height(8.dp)
                     )
 
+                    OutlinedTextField(
+
+                        value = joinDateText,
+
+                        onValueChange = {
+
+                            joinDateText = it
+
+                        },
+
+                        label = {
+
+                            Text("Joining Date (dd-MM-yyyy)")
+
+                        },
+
+                        singleLine = true
+
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
                     Text(
                         text = "Contacts",
                         style = MaterialTheme.typography.titleSmall
@@ -341,95 +461,85 @@ fun StudentsScreen() {
 
                     contactEntries.forEachIndexed { index, entry ->
 
-                        Row(
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            horizontalArrangement =
-                                Arrangement.spacedBy(8.dp)
-
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
                         ) {
 
-                            Column(
+                            OutlinedTextField(
 
-                                modifier = Modifier.weight(1f)
+                                value = entry.label,
 
-                            ) {
+                                onValueChange = { newValue ->
 
-                                OutlinedTextField(
+                                    contactEntries[index] =
+                                        entry.copy(label = newValue)
 
-                                    value = entry.label,
+                                },
 
-                                    onValueChange = { newValue ->
+                                label = {
 
-                                        contactEntries[index] =
-                                            entry.copy(label = newValue)
+                                    Text("Label")
 
-                                    },
+                                },
 
-                                    label = {
+                                singleLine = true,
 
-                                        Text("Label")
+                                modifier = Modifier.fillMaxWidth()
 
-                                    },
+                            )
 
-                                    modifier = Modifier.fillMaxWidth()
+                            Spacer(
+                                modifier = Modifier.height(8.dp)
+                            )
 
-                                )
+                            OutlinedTextField(
 
-                                Spacer(
-                                    modifier = Modifier.height(8.dp)
-                                )
+                                value = entry.number,
 
-                                OutlinedTextField(
+                                onValueChange = { newValue ->
 
-                                    value = entry.number,
+                                    contactEntries[index] =
+                                        entry.copy(number = newValue)
 
-                                    onValueChange = { newValue ->
+                                },
 
-                                        contactEntries[index] =
-                                            entry.copy(number = newValue)
+                                label = {
 
-                                    },
+                                    Text("Number")
 
-                                    label = {
+                                },
 
-                                        Text("Number")
+                                singleLine = true,
 
-                                    },
+                                modifier = Modifier.fillMaxWidth()
 
-                                    modifier = Modifier.fillMaxWidth()
-
-                                )
-
-                            }
+                            )
 
                             if (contactEntries.size > 1) {
 
-                                IconButton(
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
 
-                                    onClick = {
+                                    IconButton(
 
-                                        contactEntries.removeAt(index)
+                                        onClick = {
+
+                                            contactEntries.removeAt(index)
+
+                                        }
+
+                                    ) {
+
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = null
+                                        )
 
                                     }
 
-                                ) {
-
-                                    Icon(
-
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = null
-
-                                    )
-
                                 }
-
-                            } else {
-
-                                Spacer(
-                                    modifier = Modifier.size(48.dp)
-                                )
 
                             }
 
@@ -475,13 +585,115 @@ fun StudentsScreen() {
 
     Scaffold(
 
+        topBar = {
+
+            val selectedCount = selectedStudentIndexes.size
+            if (selectedCount > 0) {
+
+                TopAppBar(
+
+                    title = {
+
+                        Text("$selectedCount selected")
+
+                    },
+
+                    navigationIcon = {
+
+                        IconButton(
+
+                            onClick = {
+
+                                selectedStudentIndexes.clear()
+
+                            }
+
+                        ) {
+
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null
+                            )
+
+                        }
+
+                    },
+
+                    actions = {
+
+                        if (selectedCount == 1) {
+
+                            IconButton(
+
+                                onClick = {
+
+                                    val selectedIndex =
+                                        selectedStudentIndexes.first()
+                                    val student =
+                                        StudentManager.students
+                                            .getOrNull(selectedIndex)
+                                    if (student != null) {
+                                        loadForm(student)
+                                        showEditDialog = true
+                                    }
+                                }
+
+                            ) {
+
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null
+                                )
+
+                            }
+
+                        }
+
+                        IconButton(
+
+                            onClick = {
+
+                                val toRemove =
+                                    selectedStudentIndexes
+                                        .toList()
+                                        .sortedDescending()
+                                toRemove.forEach { index ->
+                                    if (index <
+                                        StudentManager.students.size
+                                    ) {
+                                        StudentManager.students
+                                            .removeAt(index)
+                                    }
+                                }
+                                selectedStudentIndexes.clear()
+                            }
+
+                        ) {
+
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null
+                            )
+
+                        }
+
+                    }
+
+                )
+
+            }
+
+        },
+
         floatingActionButton = {
 
             FloatingActionButton(
 
                 onClick = {
 
+                    resetForm()
                     showDialog = true
+                    selectedStudentIndexes.clear()
 
                 }
 
@@ -594,12 +806,45 @@ fun StudentsScreen() {
 
                 ) {
 
-                    items(students) { student ->
+                    items(
+                        items = studentsWithIndex,
+                        key = { entry -> entry.index }
+                    ) { entry ->
+
+                        val student = entry.value
+                        val isSelected =
+                            selectedStudentIndexes
+                                .contains(entry.index)
 
                         StudentGridCard(
                             studentName = student.studentName,
                             className = student.className,
-                            schoolName = student.schoolName
+                            schoolName = student.schoolName,
+                            lastFeePaidMillis =
+                                student.lastFeePaidMillis,
+                            isSelected = isSelected,
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    if (selectedStudentIndexes.isNotEmpty()) {
+                                        if (isSelected) {
+                                            selectedStudentIndexes
+                                                .remove(entry.index)
+                                        } else {
+                                            selectedStudentIndexes
+                                                .add(entry.index)
+                                        }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isSelected) {
+                                        selectedStudentIndexes
+                                            .remove(entry.index)
+                                    } else {
+                                        selectedStudentIndexes
+                                            .add(entry.index)
+                                    }
+                                }
+                            )
                         )
                     }
                 }
@@ -613,12 +858,45 @@ fun StudentsScreen() {
 
                 ) {
 
-                    items(students) { student ->
+                    items(
+                        items = studentsWithIndex,
+                        key = { entry -> entry.index }
+                    ) { entry ->
+
+                        val student = entry.value
+                        val isSelected =
+                            selectedStudentIndexes
+                                .contains(entry.index)
 
                         StudentListCard(
                             studentName = student.studentName,
                             className = student.className,
-                            schoolName = student.schoolName
+                            schoolName = student.schoolName,
+                            lastFeePaidMillis =
+                                student.lastFeePaidMillis,
+                            isSelected = isSelected,
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    if (selectedStudentIndexes.isNotEmpty()) {
+                                        if (isSelected) {
+                                            selectedStudentIndexes
+                                                .remove(entry.index)
+                                        } else {
+                                            selectedStudentIndexes
+                                                .add(entry.index)
+                                        }
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isSelected) {
+                                        selectedStudentIndexes
+                                            .remove(entry.index)
+                                    } else {
+                                        selectedStudentIndexes
+                                            .add(entry.index)
+                                    }
+                                }
+                            )
                         )
                     }
                 }
@@ -631,42 +909,84 @@ fun StudentsScreen() {
 fun StudentListCard(
     studentName: String,
     className: String,
-    schoolName: String
+    schoolName: String,
+    lastFeePaidMillis: Long?,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier
 ) {
 
     ElevatedCard(
 
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
 
         elevation =
             CardDefaults.elevatedCardElevation(
                 defaultElevation = 8.dp
-            )
+            ),
+
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
 
     ) {
 
-        Column(
-            modifier = Modifier.padding(20.dp)
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
 
-            Text(
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
 
-                text = studentName,
+                Text(
 
-                style =
-                    MaterialTheme.typography.titleLarge,
+                    text = studentName,
 
-                fontWeight = FontWeight.Bold
+                    style =
+                        MaterialTheme.typography.titleLarge,
 
-            )
+                    fontWeight = FontWeight.Bold
 
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
+                )
 
-            Text(className)
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
 
-            Text(schoolName)
+                Text(className)
+
+                Text(schoolName)
+
+                if (lastFeePaidMillis != null) {
+
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+
+                    Text(
+                        text = "Last paid: ${formatDate(lastFeePaidMillis)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                }
+            }
+
+            if (isSelected) {
+
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                )
+
+            }
         }
     }
 }
@@ -675,56 +995,98 @@ fun StudentListCard(
 fun StudentGridCard(
     studentName: String,
     className: String,
-    schoolName: String
+    schoolName: String,
+    lastFeePaidMillis: Long?,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier
 ) {
 
     ElevatedCard(
 
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(170.dp),
 
         elevation =
             CardDefaults.elevatedCardElevation(
                 defaultElevation = 8.dp
-            )
+            ),
+
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
 
     ) {
 
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
 
-            Text(
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
 
-                text = studentName,
+                Text(
 
-                style =
-                    MaterialTheme.typography.titleMedium,
+                    text = studentName,
 
-                fontWeight = FontWeight.Bold
+                    style =
+                        MaterialTheme.typography.titleMedium,
 
-            )
+                    fontWeight = FontWeight.Bold
 
-            Spacer(
-                modifier = Modifier.height(6.dp)
-            )
+                )
 
-            Text(
-                text = className,
-                style =
-                    MaterialTheme.typography.bodyMedium
-            )
+                Spacer(
+                    modifier = Modifier.height(6.dp)
+                )
 
-            Spacer(
-                modifier = Modifier.height(5.dp)
-            )
+                Text(
+                    text = className,
+                    style =
+                        MaterialTheme.typography.bodyMedium
+                )
 
-            Text(
-                text = schoolName,
-                style =
-                    MaterialTheme.typography.bodySmall
-            )
+                Spacer(
+                    modifier = Modifier.height(5.dp)
+                )
+
+                Text(
+                    text = schoolName,
+                    style =
+                        MaterialTheme.typography.bodySmall
+                )
+
+                if (lastFeePaidMillis != null) {
+
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+
+                    Text(
+                        text = "Last paid: ${formatDate(lastFeePaidMillis)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                }
+            }
+
+            if (isSelected) {
+
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                )
+
+            }
         }
     }
 }

@@ -3,6 +3,8 @@ package com.raju.edutrack.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import com.raju.edutrack.AppSettings
+import com.raju.edutrack.isFeePending
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,9 +41,13 @@ fun HomeScreen(navController: NavController) {
         .distinct()
         .size
 
-    val pendingCount = students.count {
-        it.contacts.isNotEmpty()
-    }
+        val pendingCount = students.count { student ->
+            isFeePending(
+                student = student,
+                countFeeFromJoinDate =
+                    AppSettings.countFeeFromJoinDate.value
+            )
+        }
 
     Column(
         modifier = Modifier

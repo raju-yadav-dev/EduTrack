@@ -5,4 +5,6 @@ data class Student(
     val className: String,
     val schoolName: String,
     val contacts: List<Contact>,
+    val joinDateMillis: Long,
+    val lastFeePaidMillis: Long?,
 )
