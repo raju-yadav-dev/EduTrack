@@ -22,7 +22,7 @@ import com.raju.edutrack.BatchManager
 import com.raju.edutrack.MessageSender
 import com.raju.edutrack.StudentManager
 
-@Composable
+@Composable 
 fun BatchScreen() {
     val context = LocalContext.current
     var showDialog by remember { mutableStateOf(false) }
