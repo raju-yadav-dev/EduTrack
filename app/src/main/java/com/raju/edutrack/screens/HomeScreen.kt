@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import com.raju.edutrack.AppSettings
-import com.raju.edutrack.isFeePending
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.raju.edutrack.BatchManager
+import com.raju.edutrack.effectiveMonthsUnpaid
 import com.raju.edutrack.StudentManager
 import java.util.Calendar
 
@@ -36,17 +37,19 @@ fun HomeScreen(navController: NavController) {
         .distinct()
         .size
 
-    val batchCount = students
-        .map { it.className }
-        .distinct()
-        .size
+    val batchCount = BatchManager.batches.size
 
         val pendingCount = students.count { student ->
-            isFeePending(
+            val monthlyFee =
+                student.feeDueAmount
+                    ?: AppSettings.parseClassFeeAmount(student.className)
+                    ?: AppSettings.parseDefaultFeeDueAmount()
+            effectiveMonthsUnpaid(
                 student = student,
                 countFeeFromJoinDate =
-                    AppSettings.countFeeFromJoinDate.value
-            )
+                    AppSettings.countFeeFromJoinDate.value,
+                monthlyFee = monthlyFee
+            ) > 0
         }
 
     Column(
@@ -252,7 +255,7 @@ fun DashboardHeader() {
                     text = greeting,
                     style =
                         MaterialTheme.typography.bodyLarge,
-                    color = Color.White
+                    color = Color.White.copy(alpha = 0.72f)
                 )
 
                 Spacer(

@@ -1,14 +1,17 @@
 package com.raju.edutrack.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -17,14 +20,24 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.net.Uri
+import com.raju.edutrack.AppSettings
+import com.raju.edutrack.AutoBatchMode
+import com.raju.edutrack.BatchManager
 import com.raju.edutrack.Contact
 import com.raju.edutrack.Student
 import com.raju.edutrack.StudentManager
@@ -34,6 +47,8 @@ import com.raju.edutrack.parseDateOrNull
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentsScreen() {
+
+    val context = LocalContext.current
 
     var searchText by remember {
         mutableStateOf("")
@@ -78,9 +93,18 @@ fun StudentsScreen() {
         mutableStateOf("")
     }
 
+    var batchName by remember {
+        mutableStateOf("")
+    }
+
+    var isBatchMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
     var joinDateText by remember {
         mutableStateOf(formatDate(System.currentTimeMillis()))
     }
+
 
     val contactEntries = remember {
         mutableStateListOf(ContactEntry(label = "Primary", number = ""))
@@ -88,26 +112,13 @@ fun StudentsScreen() {
 
     val normalizedSearch = searchText.trim()
 
-    val classOptions = listOf(
-        "IV",
-        "V",
-        "VI",
-        "VII",
-        "VIII",
-        "IX",
-        "X",
-        "XI",
-        "XII",
-        "1st Year",
-        "2nd Year",
-        "3rd Year",
-        "4th Year"
-    )
+    val classOptions = AppSettings.getClassOptions()
 
     fun resetForm() {
         studentName = ""
         className = ""
         schoolName = ""
+        batchName = ""
         joinDateText =
             formatDate(System.currentTimeMillis())
         contactEntries.clear()
@@ -123,6 +134,7 @@ fun StudentsScreen() {
         studentName = student.studentName
         className = student.className
         schoolName = student.schoolName
+        batchName = student.batchName.orEmpty()
         joinDateText = formatDate(student.joinDateMillis)
         contactEntries.clear()
         if (student.contacts.isEmpty()) {
@@ -201,6 +213,34 @@ fun StudentsScreen() {
                             parseDateOrNull(joinDateText)
                                 ?: System.currentTimeMillis()
 
+                        val normalizedClass = className.trim()
+                        val normalizedSchool = schoolName.trim()
+                        val manualBatch = batchName.trim()
+                        val autoBatchName = when (
+                            AppSettings.autoBatchMode.value
+                        ) {
+                            AutoBatchMode.CLASS -> normalizedClass
+                            AutoBatchMode.CLASS_SCHOOL -> {
+                                if (normalizedSchool.isNotBlank()) {
+                                    "$normalizedClass - $normalizedSchool"
+                                } else {
+                                    normalizedClass
+                                }
+                            }
+                            AutoBatchMode.NONE -> ""
+                        }
+                        val resolvedBatch = if (manualBatch.isNotBlank()) {
+                            manualBatch
+                        } else if (autoBatchName.isNotBlank()) {
+                            autoBatchName
+                        } else {
+                            AppSettings.defaultBatchName.value.trim()
+                        }
+
+                        val effectiveDueAmount =
+                            AppSettings.parseClassFeeAmount(normalizedClass)
+                                ?: AppSettings.parseDefaultFeeDueAmount()
+
                         if (showEditDialog) {
 
                             val index =
@@ -210,43 +250,78 @@ fun StudentsScreen() {
                             ) {
                                 val existing =
                                     StudentManager.students[index]
-                                StudentManager.students[index] =
+                                StudentManager.updateStudent(
+                                    context,
+                                    index,
                                     existing.copy(
                                         studentName =
                                             studentName.trim(),
                                         className =
-                                            className.trim(),
+                                            normalizedClass,
                                         schoolName =
-                                            schoolName.trim(),
+                                            normalizedSchool,
                                         contacts = contacts,
                                         joinDateMillis =
-                                            joinDateMillis
+                                            joinDateMillis,
+                                        batchName =
+                                            resolvedBatch.ifBlank { null },
+                                        feeDueAmount = effectiveDueAmount
                                     )
+                                )
+                                BatchManager.ensureBatch(
+                                    context,
+                                    resolvedBatch
+                                )
                             }
 
                         } else {
 
-                            StudentManager.students.add(
+                            val defaultDueDays =
+                                AppSettings
+                                    .parseDefaultFeeDueDays()
+                            val defaultDueDateMillis =
+                                if (defaultDueDays != null) {
+                                    joinDateMillis +
+                                        defaultDueDays *
+                                        24L * 60L * 60L * 1000L
+                                } else {
+                                    null
+                                }
 
+                            StudentManager.addStudent(
+                                context,
                                 Student(
 
                                     studentName =
                                         studentName.trim(),
 
                                     className =
-                                        className.trim(),
+                                        normalizedClass,
 
                                     schoolName =
-                                        schoolName.trim(),
+                                        normalizedSchool,
 
                                     contacts = contacts,
 
                                     joinDateMillis =
                                         joinDateMillis,
 
-                                    lastFeePaidMillis = null
+                                    lastFeePaidMillis = null,
+
+                                    feeDueAmount =
+                                        effectiveDueAmount,
+
+                                    feeDueDateMillis =
+                                        defaultDueDateMillis,
+
+                                    batchName =
+                                        resolvedBatch.ifBlank { null }
 
                                 )
+                            )
+                            BatchManager.ensureBatch(
+                                context,
+                                resolvedBatch
                             )
 
                         }
@@ -293,7 +368,10 @@ fun StudentsScreen() {
 
             text = {
 
-                Column {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                ) {
 
                     OutlinedTextField(
 
@@ -312,6 +390,91 @@ fun StudentsScreen() {
                         }
 
                     )
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    ExposedDropdownMenuBox(
+
+                        expanded = isBatchMenuExpanded,
+
+                        onExpandedChange = { expanded ->
+
+                            isBatchMenuExpanded = expanded
+
+                        }
+
+                    ) {
+
+                        OutlinedTextField(
+
+                            value = batchName,
+
+                            onValueChange = { newValue ->
+
+                                batchName = newValue
+
+                            },
+
+                            label = {
+
+                                Text("Batch")
+
+                            },
+
+                            trailingIcon = {
+
+                                ExposedDropdownMenuDefaults
+                                    .TrailingIcon(
+                                        expanded =
+                                            isBatchMenuExpanded
+                                    )
+
+                            },
+
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+
+                        )
+
+                        ExposedDropdownMenu(
+
+                            expanded = isBatchMenuExpanded,
+
+                            onDismissRequest = {
+
+                                isBatchMenuExpanded = false
+
+                            }
+
+                        ) {
+
+                            BatchManager.batches.forEach { batch ->
+
+                                DropdownMenuItem(
+
+                                    text = {
+
+                                        Text(batch.name)
+
+                                    },
+
+                                    onClick = {
+
+                                        batchName = batch.name
+                                        isBatchMenuExpanded = false
+
+                                    }
+
+                                )
+
+                            }
+
+                        }
+
+                    }
 
                     Spacer(
                         modifier = Modifier.height(8.dp)
@@ -657,14 +820,10 @@ fun StudentsScreen() {
                                     selectedStudentIndexes
                                         .toList()
                                         .sortedDescending()
-                                toRemove.forEach { index ->
-                                    if (index <
-                                        StudentManager.students.size
-                                    ) {
-                                        StudentManager.students
-                                            .removeAt(index)
-                                    }
-                                }
+                                StudentManager.removeStudents(
+                                    context,
+                                    toRemove
+                                )
                                 selectedStudentIndexes.clear()
                             }
 
@@ -820,6 +979,7 @@ fun StudentsScreen() {
                             studentName = student.studentName,
                             className = student.className,
                             schoolName = student.schoolName,
+                            batchName = student.batchName,
                             lastFeePaidMillis =
                                 student.lastFeePaidMillis,
                             isSelected = isSelected,
@@ -867,13 +1027,33 @@ fun StudentsScreen() {
                         val isSelected =
                             selectedStudentIndexes
                                 .contains(entry.index)
+                        val primaryNumber =
+                            student.contacts
+                                .firstOrNull { contact ->
+                                    contact.label.equals(
+                                        "Primary",
+                                        ignoreCase = true
+                                    ) && contact.number.isNotBlank()
+                                }
+                                ?.number
+                                ?: student.contacts
+                                    .firstOrNull { contact ->
+                                        contact.number.isNotBlank()
+                                    }
+                                    ?.number
+                                ?: ""
 
                         StudentListCard(
                             studentName = student.studentName,
                             className = student.className,
+                            joinDateMillis = student.joinDateMillis,
                             schoolName = student.schoolName,
+                            primaryNumber = primaryNumber,
+                            batchName = student.batchName,
                             lastFeePaidMillis =
                                 student.lastFeePaidMillis,
+                            feeDueAmount = student.feeDueAmount,
+                            feeDueDateMillis = student.feeDueDateMillis,
                             isSelected = isSelected,
                             modifier = Modifier.combinedClickable(
                                 onClick = {
@@ -909,15 +1089,31 @@ fun StudentsScreen() {
 fun StudentListCard(
     studentName: String,
     className: String,
+    joinDateMillis: Long,
     schoolName: String,
+    primaryNumber: String,
+    batchName: String?,
     lastFeePaidMillis: Long?,
+    feeDueAmount: Double?,
+    feeDueDateMillis: Long?,
     isSelected: Boolean,
     modifier: Modifier = Modifier
 ) {
 
+    val context = LocalContext.current
+    val sanitizedNumber = primaryNumber.trim()
+    val batchLabel =
+        batchName?.takeIf { it.isNotBlank() } ?: "-"
+
     ElevatedCard(
 
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = MaterialTheme.shapes.medium
+            ),
 
         elevation =
             CardDefaults.elevatedCardElevation(
@@ -938,40 +1134,165 @@ fun StudentListCard(
             modifier = Modifier.fillMaxWidth()
         ) {
 
-            Column(
-                modifier = Modifier.padding(20.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
 
-                Text(
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = studentName,
+                            style =
+                                MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
-                    text = studentName,
-
-                    style =
-                        MaterialTheme.typography.titleLarge,
-
-                    fontWeight = FontWeight.Bold
-
-                )
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-
-                Text(className)
-
-                Text(schoolName)
-
-                if (lastFeePaidMillis != null) {
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+                    Text(
+                        text = "Batch: $batchLabel",
+                        style = MaterialTheme.typography.bodySmall
+                    )
 
                     Spacer(
                         modifier = Modifier.height(6.dp)
                     )
 
                     Text(
-                        text = "Last paid: ${formatDate(lastFeePaidMillis)}",
+                        text = "Joined: ${formatDate(joinDateMillis)}",
                         style = MaterialTheme.typography.bodySmall
                     )
 
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+
+                    Text(
+                        text = if (sanitizedNumber.isNotBlank()) {
+                            "Number: $sanitizedNumber"
+                        } else {
+                            "Number: -"
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+
+                    Text(schoolName)
+
+                    if (lastFeePaidMillis != null) {
+
+                        Spacer(
+                            modifier = Modifier.height(6.dp)
+                        )
+
+                        Text(
+                            text = "Paid: ${formatDate(lastFeePaidMillis)}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                    }
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = className,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 96.dp)
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    if (lastFeePaidMillis == null) {
+                        Text(
+                            text = "Due",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    } else {
+                        Text(
+                            text = "Paid",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+
+                        IconButton(
+                            enabled = sanitizedNumber.isNotBlank(),
+                            onClick = {
+                                val intent = Intent(
+                                    Intent.ACTION_DIAL,
+                                    Uri.parse("tel:$sanitizedNumber")
+                                )
+                                context.startActivity(intent)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Phone,
+                                contentDescription = "Call"
+                            )
+                        }
+
+                        IconButton(
+                            enabled = sanitizedNumber.isNotBlank(),
+                            onClick = {
+                                val intent = Intent(
+                                    Intent.ACTION_SENDTO,
+                                    Uri.parse("smsto:$sanitizedNumber")
+                                )
+                                context.startActivity(intent)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Message,
+                                contentDescription = "Message"
+                            )
+                        }
+
+                        IconButton(
+                            enabled = sanitizedNumber.isNotBlank(),
+                            onClick = {
+                                val url = "https://wa.me/${sanitizedNumber}"
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(url)
+                                )
+                                context.startActivity(intent)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "WhatsApp"
+                            )
+                        }
+                    }
                 }
             }
 
@@ -996,6 +1317,7 @@ fun StudentGridCard(
     studentName: String,
     className: String,
     schoolName: String,
+    batchName: String?,
     lastFeePaidMillis: Long?,
     isSelected: Boolean,
     modifier: Modifier = Modifier
@@ -1005,7 +1327,12 @@ fun StudentGridCard(
 
         modifier = modifier
             .fillMaxWidth()
-            .height(170.dp),
+            .height(170.dp)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = MaterialTheme.shapes.medium
+            ),
 
         elevation =
             CardDefaults.elevatedCardElevation(
@@ -1060,6 +1387,26 @@ fun StudentGridCard(
                     style =
                         MaterialTheme.typography.bodySmall
                 )
+
+                Spacer(
+                    modifier = Modifier.height(4.dp)
+                )
+                val batchLabel =
+                    batchName?.takeIf { it.isNotBlank() } ?: "-"
+                Text(
+                    text = "Batch: $batchLabel",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                if (batchName?.isNotBlank() == true) {
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+                    Text(
+                        text = "Batch: $batchName",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
                 if (lastFeePaidMillis != null) {
 

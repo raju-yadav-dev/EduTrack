@@ -7,4 +7,8 @@ data class Student(
     val contacts: List<Contact>,
     val joinDateMillis: Long,
     val lastFeePaidMillis: Long?,
+    val batchName: String? = null,
+    val feeDueAmount: Double? = null,
+    val feeDueDateMillis: Long? = null,
+    val advanceBalance: Double? = null,
 )

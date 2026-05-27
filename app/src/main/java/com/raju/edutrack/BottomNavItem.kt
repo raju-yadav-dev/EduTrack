@@ -1,6 +1,7 @@
 package com.raju.edutrack
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -31,6 +32,12 @@ sealed class BottomNavItem(
         "batches",
         "Batches",
         Icons.Default.Groups
+    )
+
+    object Backup : BottomNavItem(
+        "backup",
+        "Backup",
+        Icons.Default.CloudSync
     )
 
     object Settings : BottomNavItem(

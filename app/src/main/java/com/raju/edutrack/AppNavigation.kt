@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.raju.edutrack.screens.BatchScreen
+import com.raju.edutrack.screens.CloudBackupScreen
 import com.raju.edutrack.screens.HomeScreen
 import com.raju.edutrack.screens.OverviewScreen
 import com.raju.edutrack.screens.SettingsScreen
@@ -26,6 +27,7 @@ fun AppNavigation() {
         BottomNavItem.Home,
         BottomNavItem.Students,
         BottomNavItem.Batches,
+        BottomNavItem.Backup,
         BottomNavItem.Settings
     )
     Scaffold(
@@ -76,6 +78,11 @@ fun AppNavigation() {
                 BottomNavItem.Batches.route
             ) {
                 BatchScreen()
+            }
+            composable(
+                BottomNavItem.Backup.route
+            ) {
+                CloudBackupScreen()
             }
             composable(
                 BottomNavItem.Settings.route
