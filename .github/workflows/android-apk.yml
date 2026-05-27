@@ -28,22 +28,21 @@ jobs:
       - name: Grant Gradle Permission
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk EduTrack.apk
 
       - name: Get Current Date
-        id: date
         run: echo "DATE=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_ENV
 
       - name: Create GitHub Release
-        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.DATE }}
           name: EduTrack Release ${{ env.DATE }}
-          draft: false
-          prerelease: false
-          files: |
-            app/build/outputs/apk/debug/app-debug.apk
+          files: EduTrack.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
