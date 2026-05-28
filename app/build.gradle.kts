@@ -1,11 +1,31 @@
+import java.util.Base64
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
+
+val releaseKeystoreBase64 = providers
+    .environmentVariable("EDUTRACK_KEYSTORE_BASE64")
+    .orNull
+val releaseKeystoreFile = layout.buildDirectory
+    .file("signing/edutrack-release.jks")
+    .get()
+    .asFile
+if (!releaseKeystoreBase64.isNullOrBlank()) {
+    releaseKeystoreFile.parentFile.mkdirs()
+    releaseKeystoreFile.writeBytes(
+        Base64.getDecoder().decode(releaseKeystoreBase64)
+    )
 }
+val hasReleaseSigning = releaseKeystoreFile.exists() &&
+    !providers.environmentVariable("EDUTRACK_KEYSTORE_PASSWORD").orNull
+        .isNullOrBlank() &&
+    !providers.environmentVariable("EDUTRACK_KEY_ALIAS").orNull
+        .isNullOrBlank() &&
+    !providers.environmentVariable("EDUTRACK_KEY_PASSWORD").orNull
+        .isNullOrBlank()
 
 android {
     namespace = "com.raju.edutrack"
@@ -25,9 +45,29 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseKeystoreFile
+                storePassword =
+                    providers.environmentVariable("EDUTRACK_KEYSTORE_PASSWORD")
+                        .get()
+                keyAlias =
+                    providers.environmentVariable("EDUTRACK_KEY_ALIAS")
+                        .get()
+                keyPassword =
+                    providers.environmentVariable("EDUTRACK_KEY_PASSWORD")
+                        .get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -45,7 +85,6 @@ android {
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
-    implementation(platform(libs.firebase.bom))
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.0")
 
@@ -57,10 +96,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.firebase.auth)
-    implementation(libs.firebase.firestore)
-    implementation(libs.play.services.auth)
-    implementation(libs.kotlinx.coroutines.play.services)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

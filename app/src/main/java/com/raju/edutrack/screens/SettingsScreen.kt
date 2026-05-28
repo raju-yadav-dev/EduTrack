@@ -60,89 +60,34 @@ fun SettingsScreen() {
             style = MaterialTheme.typography.headlineMedium
         )
 
-        Spacer(
-            modifier = Modifier.height(20.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "Count fee from joining date",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-                Text(
-                    text = "If enabled, new students are not pending in their joining month.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            Switch(
-                checked = AppSettings.countFeeFromJoinDate.value,
-                onCheckedChange = { isChecked ->
-                    AppSettings.countFeeFromJoinDate.value = isChecked
-                    AppSettings.save(context)
-                }
-            )
-        }
+        HorizontalDivider()
 
         Spacer(
             modifier = Modifier.height(20.dp)
         )
 
         Text(
-            text = "Default Fee Due",
+            text = "Count Fee",
             style = MaterialTheme.typography.titleMedium
         )
 
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        OutlinedTextField(
-            value = AppSettings.defaultFeeDueAmountText.value,
-            onValueChange = { newValue ->
-                AppSettings.defaultFeeDueAmountText.value = newValue
-                AppSettings.save(context)
-            },
-            label = {
-                Text("Default due amount")
-            },
-            supportingText = {
-                Text("Used when creating new students")
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        OutlinedTextField(
-            value = AppSettings.defaultFeeDueDaysText.value,
-            onValueChange = { newValue ->
-                AppSettings.defaultFeeDueDaysText.value = newValue
-                AppSettings.save(context)
-            },
-            label = {
-                Text("Default due days")
-            },
-            supportingText = {
-                Text("Days after joining date")
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        listOf(
+            true to "From joining date",
+            false to "Starting of each month"
+        ).forEach { (value, label) ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = AppSettings.countFeeFromJoinDate.value == value,
+                    onClick = {
+                        AppSettings.countFeeFromJoinDate.value = value
+                        AppSettings.save(context)
+                    }
+                )
+                Text(label)
+            }
+        }
 
         Spacer(
             modifier = Modifier.height(20.dp)
@@ -157,18 +102,26 @@ fun SettingsScreen() {
             modifier = Modifier.height(8.dp)
         )
 
-        OutlinedTextField(
-            value = AppSettings.currencySymbol.value,
-            onValueChange = { newValue ->
-                AppSettings.currencySymbol.value = newValue
-                AppSettings.save(context)
-            },
-            label = {
-                Text("Currency symbol")
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf("₹", "$", "€", "£").forEach { symbol ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = AppSettings.currencySymbol.value == symbol,
+                        onClick = {
+                            AppSettings.currencySymbol.value = symbol
+                            AppSettings.save(context)
+                        }
+                    )
+                    Text(symbol)
+                }
+            }
+        }
 
         Spacer(
             modifier = Modifier.height(20.dp)
@@ -207,60 +160,6 @@ fun SettingsScreen() {
                 )
                 Text(label)
             }
-        }
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-        OutlinedTextField(
-            value = AppSettings.defaultBatchName.value,
-            onValueChange = { newValue ->
-                AppSettings.defaultBatchName.value = newValue
-                AppSettings.save(context)
-            },
-            label = {
-                Text("Default batch name")
-            },
-            supportingText = {
-                Text("Used when auto-batch is off")
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(
-            modifier = Modifier.height(20.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "Auto advance fee due date",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
-                Text(
-                    text = "After marking as paid, move due date by 1 month",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            Switch(
-                checked = AppSettings.autoAdvanceFeeDueDate.value,
-                onCheckedChange = { isChecked ->
-                    AppSettings.autoAdvanceFeeDueDate.value = isChecked
-                    AppSettings.save(context)
-                }
-            )
         }
 
         Spacer(
@@ -303,9 +202,9 @@ fun SettingsScreen() {
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Send batch reminders")
+                Text("Batch reminder button")
                 Text(
-                    text = "Uses each batch template, or the global template when empty.",
+                    text = "Show reminder action in batches and use each batch template when sent.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -614,6 +513,9 @@ fun SettingsScreen() {
                     }
                     student.feeDueDateMillis?.let { value ->
                         item.put("feeDueDateMillis", value)
+                    }
+                    student.advanceBalance?.let { value ->
+                        item.put("advanceBalance", value)
                     }
                     val contactsArray = JSONArray()
                     student.contacts.forEach { contact ->

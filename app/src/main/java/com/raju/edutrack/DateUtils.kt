@@ -84,7 +84,7 @@ fun effectiveMonthsUnpaid(
     }
 
     val baseMillis = lastPaidMillis ?: student.joinDateMillis
-    var months = monthsBetween(baseMillis, nowMillis).coerceAtLeast(1)
+    var months = monthsBetween(baseMillis, nowMillis).coerceAtLeast(0)
     if (monthlyFee != null && monthlyFee > 0.0) {
         val advance = student.advanceBalance ?: 0.0
         val advanceMonths = (advance / monthlyFee).toInt()

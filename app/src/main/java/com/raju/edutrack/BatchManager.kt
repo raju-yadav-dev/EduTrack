@@ -4,10 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
 import com.raju.edutrack.AppSettings
 import com.raju.edutrack.AutoBatchMode
-import com.raju.edutrack.cloud.CloudBackupManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 object BatchManager {
 
@@ -76,7 +72,7 @@ object BatchManager {
     fun replaceAll(context: Context, replacement: List<Batch>) {
         batches.clear()
         batches.addAll(replacement)
-        persist(context, autoBackup = false)
+        persist(context)
     }
 
     private fun autoAssignMissingBatches(context: Context) {
@@ -112,12 +108,7 @@ object BatchManager {
             }
     }
 
-    private fun persist(context: Context, autoBackup: Boolean = true) {
+    private fun persist(context: Context) {
         BatchStorage.saveBatches(context, batches)
-        if (autoBackup) {
-            CoroutineScope(Dispatchers.IO).launch {
-                CloudBackupManager.autoBackupIfEnabled(context)
-            }
-        }
     }
 }

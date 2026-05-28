@@ -5,14 +5,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-private const val STUDENTS_FILE_NAME = "students.json"
+private const val STUDENTS_FILE_NAME = "data.json"
+private const val LEGACY_STUDENTS_FILE_NAME = "students.json"
 
 object StudentStorage {
 
     fun loadStudents(context: Context): List<Student> {
-        val file = File(context.filesDir, STUDENTS_FILE_NAME)
-        if (!file.exists()) {
-            return emptyList()
+        val primaryFile = File(context.filesDir, STUDENTS_FILE_NAME)
+        val legacyFile = File(context.filesDir, LEGACY_STUDENTS_FILE_NAME)
+        val (file, usedLegacy) = when {
+            primaryFile.exists() -> primaryFile to false
+            legacyFile.exists() -> legacyFile to true
+            else -> return emptyList()
         }
 
         val raw = file.readText()
@@ -77,6 +81,10 @@ object StudentStorage {
                     advanceBalance = advanceBalance
                 )
             )
+        }
+
+        if (usedLegacy) {
+            saveStudents(context, students)
         }
 
         return students

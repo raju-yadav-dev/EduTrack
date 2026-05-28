@@ -1,9 +1,14 @@
 name: Android APK
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
       - "**"
+    tags:
+      - "v*"
 
 jobs:
   EduTrack:
@@ -23,11 +28,37 @@ jobs:
       - name: Grant Gradle wrapper permissions
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Add Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          fi
 
-      - name: Upload APK artifact
+      - name: Build APK
+        env:
+          EDUTRACK_KEYSTORE_BASE64: ${{ secrets.EDUTRACK_KEYSTORE_BASE64 }}
+          EDUTRACK_KEYSTORE_PASSWORD: ${{ secrets.EDUTRACK_KEYSTORE_PASSWORD }}
+          EDUTRACK_KEY_ALIAS: ${{ secrets.EDUTRACK_KEY_ALIAS }}
+          EDUTRACK_KEY_PASSWORD: ${{ secrets.EDUTRACK_KEY_PASSWORD }}
+        run: ./gradlew assembleDebug assembleRelease
+
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: EduTrack-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EduTrack-release-apk
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: Add APK to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/apk/release/*.apk

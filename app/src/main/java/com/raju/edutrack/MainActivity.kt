@@ -4,7 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.raju.edutrack.cloud.CloudBackupManager
+import androidx.lifecycle.lifecycleScope
+import com.raju.edutrack.update.UpdateCheckResult
+import com.raju.edutrack.update.UpdateManager
+import kotlinx.coroutines.launch
 import com.raju.edutrack.ui.theme.EduTrackTheme
 
 class MainActivity : ComponentActivity() {
@@ -16,7 +19,15 @@ class MainActivity : ComponentActivity() {
         StudentManager.load(this)
         AppSettings.load(this)
         BatchManager.load(this)
-        CloudBackupManager.load(this)
+
+        lifecycleScope.launch {
+            when (val result = UpdateManager.checkForUpdate(this@MainActivity)) {
+                is UpdateCheckResult.UpdateAvailable -> {
+                    UpdateManager.installUpdate(this@MainActivity, result.release.downloadUrl)
+                }
+                else -> Unit
+            }
+        }
 
         enableEdgeToEdge()
 

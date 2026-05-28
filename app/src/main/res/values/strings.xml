@@ -1,4 +1,3 @@
 <resources>
     <string name="app_name">EduTrack</string>
-    <string name="default_web_client_id" translatable="false">replace_with_web_client_id</string>
 </resources>

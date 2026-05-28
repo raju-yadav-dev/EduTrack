@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import android.content.Intent
 import android.net.Uri
 import com.raju.edutrack.AppSettings
@@ -41,7 +42,9 @@ import com.raju.edutrack.BatchManager
 import com.raju.edutrack.Contact
 import com.raju.edutrack.Student
 import com.raju.edutrack.StudentManager
+import com.raju.edutrack.effectiveMonthsUnpaid
 import com.raju.edutrack.formatDate
+import com.raju.edutrack.isFeePending
 import com.raju.edutrack.parseDateOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,9 +108,12 @@ fun StudentsScreen() {
         mutableStateOf(formatDate(System.currentTimeMillis()))
     }
 
+    var expandedContactLabelIndex by remember {
+        mutableStateOf<Int?>(null)
+    }
 
     val contactEntries = remember {
-        mutableStateListOf(ContactEntry(label = "Primary", number = ""))
+        mutableStateListOf(ContactEntry(label = "Main", number = ""))
     }
 
     val normalizedSearch = searchText.trim()
@@ -124,7 +130,7 @@ fun StudentsScreen() {
         contactEntries.clear()
         contactEntries.add(
             ContactEntry(
-                label = "Primary",
+                label = "Main",
                 number = ""
             )
         )
@@ -140,15 +146,20 @@ fun StudentsScreen() {
         if (student.contacts.isEmpty()) {
             contactEntries.add(
                 ContactEntry(
-                    label = "Primary",
+                    label = "Main",
                     number = ""
                 )
             )
         } else {
             contactEntries.addAll(
                 student.contacts.map { contact ->
+                    val label = contact.label.ifBlank { "Main" }
                     ContactEntry(
-                        label = contact.label,
+                        label = if (label.equals("Primary", true)) {
+                            "Main"
+                        } else {
+                            label
+                        },
                         number = contact.number
                     )
                 }
@@ -185,12 +196,13 @@ fun StudentsScreen() {
 
         AlertDialog(
 
-            onDismissRequest = {
+            onDismissRequest = {},
 
-                showDialog = false
-                showEditDialog = false
+            properties = DialogProperties(
+                dismissOnClickOutside = false
+            ),
 
-            },
+            modifier = Modifier.imePadding(),
 
             confirmButton = {
 
@@ -201,7 +213,8 @@ fun StudentsScreen() {
                         val contacts = contactEntries
                             .map { entry ->
                                 Contact(
-                                    label = entry.label.trim(),
+                                    label = entry.label.trim()
+                                        .ifBlank { "Main" },
                                     number = entry.number.trim()
                                 )
                             }
@@ -234,12 +247,11 @@ fun StudentsScreen() {
                         } else if (autoBatchName.isNotBlank()) {
                             autoBatchName
                         } else {
-                            AppSettings.defaultBatchName.value.trim()
+                            ""
                         }
 
                         val effectiveDueAmount =
                             AppSettings.parseClassFeeAmount(normalizedClass)
-                                ?: AppSettings.parseDefaultFeeDueAmount()
 
                         if (showEditDialog) {
 
@@ -276,18 +288,6 @@ fun StudentsScreen() {
 
                         } else {
 
-                            val defaultDueDays =
-                                AppSettings
-                                    .parseDefaultFeeDueDays()
-                            val defaultDueDateMillis =
-                                if (defaultDueDays != null) {
-                                    joinDateMillis +
-                                        defaultDueDays *
-                                        24L * 60L * 60L * 1000L
-                                } else {
-                                    null
-                                }
-
                             StudentManager.addStudent(
                                 context,
                                 Student(
@@ -312,7 +312,7 @@ fun StudentsScreen() {
                                         effectiveDueAmount,
 
                                     feeDueDateMillis =
-                                        defaultDueDateMillis,
+                                        null,
 
                                     batchName =
                                         resolvedBatch.ifBlank { null }
@@ -370,6 +370,8 @@ fun StudentsScreen() {
 
                 Column(
                     modifier = Modifier
+                        .heightIn(max = 560.dp)
+                        .imePadding()
                         .verticalScroll(rememberScrollState())
                 ) {
 
@@ -628,28 +630,100 @@ fun StudentsScreen() {
                             modifier = Modifier.fillMaxWidth()
                         ) {
 
-                            OutlinedTextField(
-
-                                value = entry.label,
-
-                                onValueChange = { newValue ->
-
-                                    contactEntries[index] =
-                                        entry.copy(label = newValue)
-
-                                },
-
-                                label = {
-
-                                    Text("Label")
-
-                                },
-
-                                singleLine = true,
-
-                                modifier = Modifier.fillMaxWidth()
-
+                            val defaultLabels = listOf(
+                                "Main",
+                                "Guardian",
+                                "Father",
+                                "Mother"
                             )
+                            val isCustomLabel = defaultLabels.none { label ->
+                                label.equals(entry.label, ignoreCase = true)
+                            }
+
+                            ExposedDropdownMenuBox(
+                                expanded = expandedContactLabelIndex == index,
+                                onExpandedChange = { expanded ->
+                                    expandedContactLabelIndex =
+                                        if (expanded) index else null
+                                }
+                            ) {
+                                OutlinedTextField(
+
+                                    value = if (isCustomLabel) {
+                                        "Custom"
+                                    } else {
+                                        entry.label
+                                    },
+
+                                    onValueChange = {},
+
+                                    label = {
+
+                                        Text("Label")
+
+                                    },
+
+                                    readOnly = true,
+
+                                    singleLine = true,
+
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults
+                                            .TrailingIcon(
+                                                expanded =
+                                                    expandedContactLabelIndex == index
+                                            )
+                                    },
+
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = expandedContactLabelIndex == index,
+                                    onDismissRequest = {
+                                        expandedContactLabelIndex = null
+                                    }
+                                ) {
+                                    defaultLabels.forEach { label ->
+                                        DropdownMenuItem(
+                                            text = { Text(label) },
+                                            onClick = {
+                                                contactEntries[index] =
+                                                    entry.copy(label = label)
+                                                expandedContactLabelIndex = null
+                                            }
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("Custom") },
+                                        onClick = {
+                                            contactEntries[index] =
+                                                entry.copy(label = "")
+                                            expandedContactLabelIndex = null
+                                        }
+                                    )
+                                }
+                            }
+
+                            if (isCustomLabel) {
+                                Spacer(
+                                    modifier = Modifier.height(8.dp)
+                                )
+
+                                OutlinedTextField(
+                                    value = entry.label,
+                                    onValueChange = { newValue ->
+                                        contactEntries[index] =
+                                            entry.copy(label = newValue)
+                                    },
+                                    label = { Text("Custom label") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
 
                             Spacer(
                                 modifier = Modifier.height(8.dp)
@@ -720,7 +794,7 @@ fun StudentsScreen() {
 
                             contactEntries.add(
                                 ContactEntry(
-                                    label = "",
+                                    label = "Guardian",
                                     number = ""
                                 )
                             )
@@ -1031,17 +1105,40 @@ fun StudentsScreen() {
                             student.contacts
                                 .firstOrNull { contact ->
                                     contact.label.equals(
-                                        "Primary",
+                                        "Main",
                                         ignoreCase = true
                                     ) && contact.number.isNotBlank()
                                 }
                                 ?.number
                                 ?: student.contacts
                                     .firstOrNull { contact ->
+                                        contact.label.equals(
+                                            "Primary",
+                                            ignoreCase = true
+                                        ) && contact.number.isNotBlank()
+                                    }
+                                    ?.number
+                                ?: student.contacts
+                                    .firstOrNull { contact ->
                                         contact.number.isNotBlank()
                                     }
                                     ?.number
                                 ?: ""
+                        val monthlyFee =
+                            student.feeDueAmount
+                                ?: AppSettings.parseClassFeeAmount(
+                                    student.className
+                                )
+                        val feePending = effectiveMonthsUnpaid(
+                            student = student,
+                            countFeeFromJoinDate =
+                                AppSettings.countFeeFromJoinDate.value,
+                            monthlyFee = monthlyFee
+                        ) > 0 && isFeePending(
+                            student = student,
+                            countFeeFromJoinDate =
+                                AppSettings.countFeeFromJoinDate.value
+                        )
 
                         StudentListCard(
                             studentName = student.studentName,
@@ -1054,6 +1151,7 @@ fun StudentsScreen() {
                                 student.lastFeePaidMillis,
                             feeDueAmount = student.feeDueAmount,
                             feeDueDateMillis = student.feeDueDateMillis,
+                            feePending = feePending,
                             isSelected = isSelected,
                             modifier = Modifier.combinedClickable(
                                 onClick = {
@@ -1096,6 +1194,7 @@ fun StudentListCard(
     lastFeePaidMillis: Long?,
     feeDueAmount: Double?,
     feeDueDateMillis: Long?,
+    feePending: Boolean,
     isSelected: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -1194,19 +1293,6 @@ fun StudentListCard(
                     )
 
                     Text(schoolName)
-
-                    if (lastFeePaidMillis != null) {
-
-                        Spacer(
-                            modifier = Modifier.height(6.dp)
-                        )
-
-                        Text(
-                            text = "Paid: ${formatDate(lastFeePaidMillis)}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-
-                    }
                 }
 
                 Column(
@@ -1224,14 +1310,27 @@ fun StudentListCard(
                         modifier = Modifier.height(4.dp)
                     )
 
-                    if (lastFeePaidMillis == null) {
+                    if (feePending) {
                         Text(
                             text = "Due",
                             style = MaterialTheme.typography.labelMedium
                         )
+                    } else if (lastFeePaidMillis != null) {
+                        Column(
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Text(
+                                text = "Paid",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Text(
+                                text = formatDate(lastFeePaidMillis),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     } else {
                         Text(
-                            text = "Paid",
+                            text = "No due",
                             style = MaterialTheme.typography.labelMedium
                         )
                     }
@@ -1397,16 +1496,6 @@ fun StudentGridCard(
                     text = "Batch: $batchLabel",
                     style = MaterialTheme.typography.bodySmall
                 )
-
-                if (batchName?.isNotBlank() == true) {
-                    Spacer(
-                        modifier = Modifier.height(6.dp)
-                    )
-                    Text(
-                        text = "Batch: $batchName",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
 
                 if (lastFeePaidMillis != null) {
 

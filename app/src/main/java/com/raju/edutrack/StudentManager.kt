@@ -2,10 +2,6 @@ package com.raju.edutrack
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
-import com.raju.edutrack.cloud.CloudBackupManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 object StudentManager {
 
@@ -60,16 +56,11 @@ object StudentManager {
     ) {
         students.clear()
         students.addAll(replacement)
-        persist(context, autoBackup = false)
+        persist(context)
     }
 
-    private fun persist(context: Context, autoBackup: Boolean = true) {
+    private fun persist(context: Context) {
         StudentStorage.saveStudents(context, students)
-        if (autoBackup) {
-            CoroutineScope(Dispatchers.IO).launch {
-                CloudBackupManager.autoBackupIfEnabled(context)
-            }
-        }
     }
 
 }

@@ -39,7 +39,6 @@ fun OverviewScreen(
             val monthlyFee =
                 student.feeDueAmount
                     ?: AppSettings.parseClassFeeAmount(student.className)
-                    ?: AppSettings.parseDefaultFeeDueAmount()
             val unpaid = effectiveMonthsUnpaid(
                 student = student,
                 countFeeFromJoinDate =
@@ -90,7 +89,7 @@ fun OverviewScreen(
                 )
             }
 
-        "Pending" -> emptyList()
+        "Fee" -> emptyList()
 
         else -> emptyList()
 
@@ -118,7 +117,6 @@ fun OverviewScreen(
                                     ?: AppSettings.parseClassFeeAmount(
                                         student.className
                                     )
-                                    ?: AppSettings.parseDefaultFeeDueAmount()
                             if (monthlyFee != null && monthlyFee > 0.0) {
                                 val monthsUnpaid = monthsBetween(
                                     baseMillis,
@@ -227,7 +225,7 @@ fun OverviewScreen(
             modifier = Modifier.height(20.dp)
         )
         val showEmptyState = when (title) {
-            "Pending" -> pendingStudents.isEmpty()
+            "Fee" -> pendingStudents.isEmpty()
             "Schools" -> schoolGroups.isEmpty()
             else -> data.isEmpty()
         }
@@ -245,7 +243,7 @@ fun OverviewScreen(
                 verticalArrangement =
                     Arrangement.spacedBy(12.dp)
             ) {
-                if (title == "Pending") {
+                if (title == "Fee") {
 
                     items(pendingStudents) { entry ->
 
@@ -259,7 +257,6 @@ fun OverviewScreen(
                                 ?: AppSettings.parseClassFeeAmount(
                                     student.className
                                 )
-                                ?: AppSettings.parseDefaultFeeDueAmount()
                         val monthsUnpaid = effectiveMonthsUnpaid(
                             student = student,
                             countFeeFromJoinDate =
@@ -279,52 +276,58 @@ fun OverviewScreen(
                                 Column(
                                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
                                 ) {
-                                    Checkbox(
-                                        checked = false,
-                                        onCheckedChange = { checked ->
-                                            if (checked) {
-                                                val nextDueDate =
-                                                    if (AppSettings
-                                                        .autoAdvanceFeeDueDate
-                                                        .value
-                                                    ) {
-                                                        addMonths(
-                                                            System.currentTimeMillis(),
-                                                            1
-                                                        )
-                                                    } else {
-                                                        null
-                                                    }
-                                                val updatedStudent =
-                                                    student.copy(
-                                                        lastFeePaidMillis =
-                                                            System.currentTimeMillis(),
-                                                        feeDueAmount = null,
-                                                        feeDueDateMillis =
-                                                            nextDueDate
+                                    Button(
+                                        onClick = {
+                                            val nextDueDate =
+                                                if (AppSettings
+                                                    .autoAdvanceFeeDueDate
+                                                    .value
+                                                ) {
+                                                    addMonths(
+                                                        System.currentTimeMillis(),
+                                                        1
                                                     )
-                                                StudentManager.updateStudent(
-                                                    context,
-                                                    index,
-                                                    updatedStudent
+                                                } else {
+                                                    student.feeDueDateMillis
+                                                }
+                                            val updatedStudent =
+                                                student.copy(
+                                                    lastFeePaidMillis =
+                                                        System.currentTimeMillis(),
+                                                    feeDueDateMillis =
+                                                        nextDueDate,
+                                                    advanceBalance = null
                                                 )
-                                                MessageSender.sendFeePaidMessage(
-                                                    context = context,
-                                                    student = updatedStudent,
-                                                    amountPaid = dueAmount ?: 0.0,
-                                                    dueAmount = 0.0,
-                                                    batch = BatchManager.batches.firstOrNull { batch ->
-                                                        updatedStudent.batchName?.let { name ->
-                                                            batch.name.equals(
-                                                                name,
-                                                                ignoreCase = true
-                                                            )
-                                                        } == true
-                                                    }
-                                                )
-                                            }
+                                            StudentManager.updateStudent(
+                                                context,
+                                                index,
+                                                updatedStudent
+                                            )
+                                            val fullDueAmount =
+                                                dueAmount?.let { amount ->
+                                                    (
+                                                        amount * monthsUnpaid -
+                                                            (student.advanceBalance ?: 0.0)
+                                                        ).coerceAtLeast(0.0)
+                                                } ?: 0.0
+                                            MessageSender.sendFeePaidMessage(
+                                                context = context,
+                                                student = updatedStudent,
+                                                amountPaid = fullDueAmount,
+                                                dueAmount = 0.0,
+                                                batch = BatchManager.batches.firstOrNull { batch ->
+                                                    updatedStudent.batchName?.let { name ->
+                                                        batch.name.equals(
+                                                            name,
+                                                            ignoreCase = true
+                                                        )
+                                                    } == true
+                                                }
+                                            )
                                         }
-                                    )
+                                    ) {
+                                        Text("Paid fully")
+                                    }
 
                                     TextButton(
                                         onClick = {
@@ -407,21 +410,13 @@ fun OverviewScreen(
                                             MaterialTheme.typography.bodySmall
                                     )
 
-                                    val lastPaid =
-                                        student.lastFeePaidMillis
-                                    if (lastPaid != null) {
+                                }
 
-                                        Spacer(
-                                            modifier = Modifier.height(4.dp)
-                                        )
-
-                                        Text(
-                                            text = "Last paid: ${formatDate(lastPaid)}",
-                                            style =
-                                                MaterialTheme.typography.bodySmall
-                                        )
-
-                                    }
+                                student.lastFeePaidMillis?.let { lastPaid ->
+                                    Text(
+                                        text = "Paid: ${formatDate(lastPaid)}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         }
@@ -489,6 +484,46 @@ fun OverviewScreen(
                                     modifier = Modifier.height(12.dp)
                                 )
                             }
+                        }
+                    } else if (title == "Students") {
+                        items(students.withIndex().toList()) { entry ->
+                            val student = entry.value
+                            val primaryNumber =
+                                student.contacts
+                                    .firstOrNull { contact ->
+                                        contact.label.equals(
+                                            "Main",
+                                            ignoreCase = true
+                                        ) && contact.number.isNotBlank()
+                                    }
+                                    ?.number
+                                    ?: student.contacts
+                                        .firstOrNull { contact ->
+                                            contact.label.equals(
+                                                "Primary",
+                                                ignoreCase = true
+                                            ) && contact.number.isNotBlank()
+                                        }
+                                        ?.number
+                                    ?: student.contacts
+                                        .firstOrNull { contact ->
+                                            contact.number.isNotBlank()
+                                        }
+                                        ?.number
+                                    ?: ""
+                            StudentListCard(
+                                studentName = student.studentName,
+                                className = student.className,
+                                joinDateMillis = student.joinDateMillis,
+                                schoolName = student.schoolName,
+                                primaryNumber = primaryNumber,
+                                batchName = student.batchName,
+                                lastFeePaidMillis = student.lastFeePaidMillis,
+                                feeDueAmount = student.feeDueAmount,
+                                feeDueDateMillis = student.feeDueDateMillis,
+                                feePending = false,
+                                isSelected = false
+                            )
                         }
                     } else {
                         items(data) { item ->

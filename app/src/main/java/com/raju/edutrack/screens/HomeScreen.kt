@@ -2,9 +2,8 @@ package com.raju.edutrack.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import com.raju.edutrack.AppSettings
-import androidx.compose.foundation.lazy.items
+import com.raju.edutrack.BottomNavItem
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Groups
@@ -16,9 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.raju.edutrack.BatchManager
@@ -43,7 +39,6 @@ fun HomeScreen(navController: NavController) {
             val monthlyFee =
                 student.feeDueAmount
                     ?: AppSettings.parseClassFeeAmount(student.className)
-                    ?: AppSettings.parseDefaultFeeDueAmount()
             effectiveMonthsUnpaid(
                 student = student,
                 countFeeFromJoinDate =
@@ -82,7 +77,7 @@ fun HomeScreen(navController: NavController) {
             OverviewCard(
                 onClick = {
                     navController.navigate(
-                        "overview/Students"
+                        BottomNavItem.Students.route
                     )
                 },
                 title = "Students",
@@ -127,7 +122,7 @@ fun HomeScreen(navController: NavController) {
             OverviewCard(
                 onClick = {
                     navController.navigate(
-                        "overview/Batches"
+                        BottomNavItem.Batches.route
                     )
                 },
                 title = "Batches",
@@ -144,10 +139,10 @@ fun HomeScreen(navController: NavController) {
             OverviewCard(
                 onClick = {
                     navController.navigate(
-                        "overview/Pending"
+                        "overview/Fee"
                     )
                 },
-                title = "Pending",
+                title = "Fee",
                 value = pendingCount.toString(),
                 icon = {
                     Icon(
@@ -157,53 +152,6 @@ fun HomeScreen(navController: NavController) {
                 },
                 modifier = Modifier.weight(1f)
             )
-        }
-
-        Spacer(
-            modifier = Modifier.height(28.dp)
-        )
-
-        Text(
-            text = "Recent Students",
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        LazyRow(
-            horizontalArrangement =
-                Arrangement.spacedBy(12.dp)
-        ) {
-
-            items(students) { student ->
-
-                ElevatedCard(
-                    modifier = Modifier.width(220.dp)
-                ) {
-
-                    Column(
-                        modifier = Modifier.padding(15.dp)
-                    ) {
-
-                        Text(
-                            text = student.studentName,
-                            style =
-                                MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(8.dp)
-                        )
-
-                        Text(student.className)
-
-                        Text(student.schoolName)
-                    }
-                }
-            }
         }
     }
 }
@@ -217,12 +165,7 @@ fun DashboardHeader() {
             .height(180.dp)
             .clip(RoundedCornerShape(28.dp))
             .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.tertiary
-                    )
-                )
+                MaterialTheme.colorScheme.surface
             )
     ) {
 
@@ -255,7 +198,7 @@ fun DashboardHeader() {
                     text = greeting,
                     style =
                         MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.72f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(
@@ -266,13 +209,13 @@ fun DashboardHeader() {
                     text = "EduTrack Dashboard",
                     style =
                         MaterialTheme.typography.headlineMedium,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
             Text(
                 text = "Manage Students Professionally",
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
