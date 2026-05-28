@@ -46,6 +46,17 @@ jobs:
           EDUTRACK_KEY_PASSWORD: ${{ secrets.EDUTRACK_KEY_PASSWORD }}
         run: ./gradlew assembleDebug assembleRelease
 
+      - name: Verify release APK is signed
+        run: |
+          if [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            echo "Unsigned release APK generated. Check signing secrets."
+            exit 1
+          fi
+          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
+            echo "Signed release APK not found."
+            exit 1
+          fi
+
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -56,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EduTrack-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/release/app-release.apk
 
       - name: Get latest release tag
         if: github.ref == 'refs/heads/main'
@@ -76,11 +87,11 @@ jobs:
         with:
           tag_name: ${{ steps.latest_release.outputs.tag_name }}
           files: |
-            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/app-release.apk
 
       - name: Add APK to GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/app-release.apk
