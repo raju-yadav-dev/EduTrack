@@ -38,71 +38,33 @@ jobs:
             printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
           fi
 
-      - name: Build APK
+      - name: Build Signed Release APK
         env:
           EDUTRACK_KEYSTORE_BASE64: ${{ secrets.EDUTRACK_KEYSTORE_BASE64 }}
           EDUTRACK_KEYSTORE_PASSWORD: ${{ secrets.EDUTRACK_KEYSTORE_PASSWORD }}
           EDUTRACK_KEY_ALIAS: ${{ secrets.EDUTRACK_KEY_ALIAS }}
           EDUTRACK_KEY_PASSWORD: ${{ secrets.EDUTRACK_KEY_PASSWORD }}
-        run: ./gradlew assembleDebug assembleRelease
+        run: ./gradlew assembleRelease
 
-      - name: Verify release APK is signed
+      - name: Verify APK is signed
         run: |
           if [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            echo "Unsigned release APK generated. Check signing secrets."
-            exit 1
-          fi
-          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
-            echo "Signed release APK not found."
+            echo "Unsigned APK generated"
             exit 1
           fi
 
-      - name: Rename release APK with version
+      - name: Rename APK
         run: |
-          VERSION="${{ github.ref_name }}"
-          if [ "${{ github.ref_type }}" != "tag" ] && [ -n "${{ steps.latest_release.outputs.tag_name }}" ]; then
-            VERSION="${{ steps.latest_release.outputs.tag_name }}"
-          fi
-          if [ "${VERSION#v}" = "${VERSION}" ]; then
-            VERSION="v${VERSION}"
-          fi
-          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/EduTrack-release-${VERSION}.apk"
+          mv app/build/outputs/apk/release/app-release.apk EduTrack.apk
 
-      - name: Upload debug APK artifact
+      - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EduTrack-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: EduTrack-release
+          path: EduTrack.apk
 
-      - name: Upload release APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: EduTrack-release-apk
-          path: app/build/outputs/apk/release/EduTrack-release-*.apk
-
-      - name: Get latest release tag
-        if: github.ref == 'refs/heads/main'
-        id: latest_release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const latest = await github.rest.repos.getLatestRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
-            core.setOutput('tag_name', latest.data.tag_name);
-
-      - name: Add APK to latest release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.latest_release.outputs.tag_name }}
-          files: |
-            app/build/outputs/apk/release/EduTrack-release-*.apk
-
-      - name: Add APK to GitHub release
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            app/build/outputs/apk/release/EduTrack-release-*.apk
+          files: EduTrack.apk
