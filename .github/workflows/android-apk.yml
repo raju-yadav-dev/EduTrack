@@ -49,22 +49,30 @@ jobs:
       - name: Verify APK is signed
         run: |
           if [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            echo "Unsigned APK generated"
+            echo "Unsigned APK generated. Check signing secrets."
+            exit 1
+          fi
+          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
+            echo "Signed APK not found."
             exit 1
           fi
 
       - name: Rename APK
         run: |
-          mv app/build/outputs/apk/release/app-release.apk EduTrack.apk
+          VERSION="${{ github.ref_name }}"
+          if [ "${VERSION#v}" = "${VERSION}" ]; then
+            VERSION="v${VERSION}"
+          fi
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/EduTrack-release-${VERSION}.apk"
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: EduTrack-release
-          path: EduTrack.apk
+          path: app/build/outputs/apk/release/EduTrack-release-*.apk
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: EduTrack.apk
+          files: app/build/outputs/apk/release/EduTrack-release-*.apk
