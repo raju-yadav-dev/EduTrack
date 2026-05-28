@@ -277,4 +277,11 @@ EduTrack aims to become a modern educational management platform with:
 
 # Screenshots
 
-Add ap
+<img width="576" height="1161" alt="Home Dashboard" src="https://github.com/user-attachments/assets/6f45e32e-45fb-4050-b196-1e07b72075a4" />
+<img width="576" height="1163" alt="Batch Section" src="https://github.com/user-attachments/assets/f2b238d6-7a5c-4d2c-bb6a-0c3d5b3d6df2" />
+<img width="576" height="1158" alt="Settings Section" src="https://github.com/user-attachments/assets/d0f4ca6b-4f04-4bf6-9dc3-2ab77a606617" />
+<img width="576" height="1159" alt="Settings" src="https://github.com/user-attachments/assets/494d7af9-50a1-4645-bc44-e8d51f745776" />
+<img width="576" height="1156" alt="Student Section Grid View" src="https://github.com/user-attachments/assets/70632ed0-2d8e-4300-a12b-07f4d792f6b8" />
+<img width="576" height="1158" alt="Student Section List View" src="https://github.com/user-attachments/assets/d966e677-73a0-46a9-9521-87c436b3df91" />
+<img width="576" height="1147" alt="Fee Section" src="https://github.com/user-attachments/assets/5196e1ad-c42e-480b-8763-9a26c4c478b0" />
+
