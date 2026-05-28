@@ -57,6 +57,17 @@ jobs:
             exit 1
           fi
 
+      - name: Rename release APK with version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          if [ "${{ github.ref_type }}" != "tag" ] && [ -n "${{ steps.latest_release.outputs.tag_name }}" ]; then
+            VERSION="${{ steps.latest_release.outputs.tag_name }}"
+          fi
+          if [ "${VERSION#v}" = "${VERSION}" ]; then
+            VERSION="v${VERSION}"
+          fi
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/EduTrack-release-${VERSION}.apk"
+
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -67,7 +78,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EduTrack-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/release/EduTrack-release-*.apk
 
       - name: Get latest release tag
         if: github.ref == 'refs/heads/main'
@@ -87,11 +98,11 @@ jobs:
         with:
           tag_name: ${{ steps.latest_release.outputs.tag_name }}
           files: |
-            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/EduTrack-release-*.apk
 
       - name: Add APK to GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/EduTrack-release-*.apk
