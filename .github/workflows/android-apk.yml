@@ -6,16 +6,9 @@ permissions:
 on:
   push:
     branches:
-<<<<<<< HEAD
-      - "**"
+      - main
     tags:
       - "v*"
-=======
-      - main
-
-permissions:
-  contents: write
->>>>>>> 81f7fb0989fa29dd004138934175c9c9de3a0608
 
 jobs:
   build:
@@ -37,7 +30,6 @@ jobs:
       - name: Grant Gradle Permission
         run: chmod +x gradlew
 
-<<<<<<< HEAD
       - name: Add Firebase config
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -72,23 +64,3 @@ jobs:
         with:
           files: |
             app/build/outputs/apk/release/*.apk
-=======
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-
-      - name: Rename APK
-        run: |
-          mv app/build/outputs/apk/release/app-release.apk EduTrack.apk
-
-      - name: Get Current Date
-        run: echo "DATE=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_ENV
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.DATE }}
-          name: EduTrack Release ${{ env.DATE }}
-          files: EduTrack.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
->>>>>>> 81f7fb0989fa29dd004138934175c9c9de3a0608
