@@ -37,8 +37,13 @@ fun OverviewScreen(
         .filter { entry ->
             val student = entry.value
             val monthlyFee =
-                student.feeDueAmount
-                    ?: AppSettings.parseClassFeeAmount(student.className)
+                student.feeDueAmount ?: if (
+                    AppSettings.autoClassFeesEnabled.value
+                ) {
+                    AppSettings.parseClassFeeAmount(student.className)
+                } else {
+                    null
+                }
             val unpaid = effectiveMonthsUnpaid(
                 student = student,
                 countFeeFromJoinDate =
@@ -113,10 +118,15 @@ fun OverviewScreen(
                                 student.lastFeePaidMillis
                                     ?: student.joinDateMillis
                             val monthlyFee =
-                                student.feeDueAmount
-                                    ?: AppSettings.parseClassFeeAmount(
+                                student.feeDueAmount ?: if (
+                                    AppSettings.autoClassFeesEnabled.value
+                                ) {
+                                    AppSettings.parseClassFeeAmount(
                                         student.className
                                     )
+                                } else {
+                                    null
+                                }
                             if (monthlyFee != null && monthlyFee > 0.0) {
                                 val monthsUnpaid = monthsBetween(
                                     baseMillis,
@@ -253,10 +263,15 @@ fun OverviewScreen(
                             student.lastFeePaidMillis
                                 ?: student.joinDateMillis
                         val dueAmount =
-                            student.feeDueAmount
-                                ?: AppSettings.parseClassFeeAmount(
+                            student.feeDueAmount ?: if (
+                                AppSettings.autoClassFeesEnabled.value
+                            ) {
+                                AppSettings.parseClassFeeAmount(
                                     student.className
                                 )
+                            } else {
+                                null
+                            }
                         val monthsUnpaid = effectiveMonthsUnpaid(
                             student = student,
                             countFeeFromJoinDate =
@@ -276,7 +291,7 @@ fun OverviewScreen(
                                 Column(
                                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
                                 ) {
-                                    Button(
+                                    TextButton(
                                         onClick = {
                                             val nextDueDate =
                                                 if (AppSettings
@@ -394,10 +409,22 @@ fun OverviewScreen(
                                         "$currency${"%.2f".format(normalized)}"
                                     } ?: "-"
                                     Text(
-                                        text = "Monthly: $monthlyFeeText • Total due: $totalDueText",
+                                        text = "Monthly: $monthlyFeeText",
                                         style =
                                             MaterialTheme.typography.bodySmall
                                     )
+                                    Text(
+                                        text = "Total due: $totalDueText",
+                                        style =
+                                            MaterialTheme.typography.bodySmall
+                                    )
+                                    student.lastFeePaidMillis?.let { lastPaid ->
+                                        Text(
+                                            text = "Paid: ${formatDate(lastPaid)}",
+                                            style =
+                                                MaterialTheme.typography.bodySmall
+                                        )
+                                    }
                                     if (advance > 0.0) {
                                         Text(
                                             text = "Advance: $currency${"%.2f".format(advance)}",
@@ -410,13 +437,6 @@ fun OverviewScreen(
                                             MaterialTheme.typography.bodySmall
                                     )
 
-                                }
-
-                                student.lastFeePaidMillis?.let { lastPaid ->
-                                    Text(
-                                        text = "Paid: ${formatDate(lastPaid)}",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
                                 }
                             }
                         }

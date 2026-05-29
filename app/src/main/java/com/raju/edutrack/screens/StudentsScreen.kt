@@ -108,6 +108,10 @@ fun StudentsScreen() {
         mutableStateOf(formatDate(System.currentTimeMillis()))
     }
 
+    var feeDueAmountText by remember {
+        mutableStateOf("")
+    }
+
     var expandedContactLabelIndex by remember {
         mutableStateOf<Int?>(null)
     }
@@ -127,6 +131,7 @@ fun StudentsScreen() {
         batchName = ""
         joinDateText =
             formatDate(System.currentTimeMillis())
+        feeDueAmountText = ""
         contactEntries.clear()
         contactEntries.add(
             ContactEntry(
@@ -142,6 +147,9 @@ fun StudentsScreen() {
         schoolName = student.schoolName
         batchName = student.batchName.orEmpty()
         joinDateText = formatDate(student.joinDateMillis)
+        feeDueAmountText = student.feeDueAmount?.let { amount ->
+            "%.2f".format(amount)
+        }.orEmpty()
         contactEntries.clear()
         if (student.contacts.isEmpty()) {
             contactEntries.add(
@@ -250,8 +258,15 @@ fun StudentsScreen() {
                             ""
                         }
 
-                        val effectiveDueAmount =
+                        val effectiveDueAmount = if (
+                            AppSettings.autoClassFeesEnabled.value
+                        ) {
                             AppSettings.parseClassFeeAmount(normalizedClass)
+                        } else {
+                            feeDueAmountText.trim()
+                                .toDoubleOrNull()
+                                ?.takeIf { amount -> amount > 0.0 }
+                        }
 
                         if (showEditDialog) {
 
@@ -614,6 +629,39 @@ fun StudentsScreen() {
                     Spacer(
                         modifier = Modifier.height(8.dp)
                     )
+
+                    if (!AppSettings.autoClassFeesEnabled.value) {
+
+                        OutlinedTextField(
+
+                            value = feeDueAmountText,
+
+                            onValueChange = {
+
+                                feeDueAmountText = it
+
+                            },
+
+                            label = {
+
+                                Text("Monthly Fee")
+
+                            },
+
+                            prefix = {
+
+                                Text(AppSettings.currencySymbol.value)
+
+                            },
+
+                            singleLine = true
+
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+                    }
 
                     Text(
                         text = "Contacts",
@@ -1125,10 +1173,15 @@ fun StudentsScreen() {
                                     ?.number
                                 ?: ""
                         val monthlyFee =
-                            student.feeDueAmount
-                                ?: AppSettings.parseClassFeeAmount(
+                            student.feeDueAmount ?: if (
+                                AppSettings.autoClassFeesEnabled.value
+                            ) {
+                                AppSettings.parseClassFeeAmount(
                                     student.className
                                 )
+                            } else {
+                                null
+                            }
                         val feePending = effectiveMonthsUnpaid(
                             student = student,
                             countFeeFromJoinDate =

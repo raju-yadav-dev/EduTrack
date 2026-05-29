@@ -310,113 +310,145 @@ fun SettingsScreen() {
             modifier = Modifier.height(8.dp)
         )
 
-        AppSettings.classFeeEntries.forEachIndexed { index, entry ->
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                Column(
-                    modifier = Modifier.padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ExposedDropdownMenuBox(
-                            expanded = expandedClassIndex == index,
-                            onExpandedChange = { expanded ->
-                                expandedClassIndex = if (expanded) index else null
-                            }
-                        ) {
-                            OutlinedTextField(
-                                value = entry.className,
-                                onValueChange = {},
-                                label = { Text("Class") },
-                                readOnly = true,
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(
-                                        expanded = expandedClassIndex == index
-                                    )
-                                },
-                                singleLine = true,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .menuAnchor()
-                            )
-
-                            ExposedDropdownMenu(
-                                expanded = expandedClassIndex == index,
-                                onDismissRequest = { expandedClassIndex = null }
-                            ) {
-                                classOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            AppSettings.classFeeEntries[index] =
-                                                entry.copy(className = option)
-                                            AppSettings.save(context)
-                                            expandedClassIndex = null
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        IconButton(
-                            onClick = {
-                                AppSettings.classFeeEntries.removeAt(index)
-                                AppSettings.save(context)
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Remove"
-                            )
-                        }
-                    }
-
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = entry.amountText,
-                        onValueChange = { newValue ->
-                            AppSettings.classFeeEntries[index] =
-                                entry.copy(amountText = newValue)
-                            AppSettings.save(context)
-                        },
-                        label = { Text("Monthly fee") },
-                        prefix = {
-                            Text(AppSettings.currencySymbol.value)
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                Text("Set fee automatically")
+                Text(
+                    text = "Use the monthly fee saved for each class when adding students.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
+            Switch(
+                checked = AppSettings.autoClassFeesEnabled.value,
+                onCheckedChange = { isChecked ->
+                    AppSettings.autoClassFeesEnabled.value = isChecked
+                    AppSettings.save(context)
+                }
             )
         }
 
-        FilledTonalButton(
-            onClick = {
-                AppSettings.classFeeEntries.add(
-                    ClassFeeEntry(className = "", amountText = "")
+        if (AppSettings.autoClassFeesEnabled.value) {
+            AppSettings.classFeeEntries.forEachIndexed { index, entry ->
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ExposedDropdownMenuBox(
+                                expanded = expandedClassIndex == index,
+                                onExpandedChange = { expanded ->
+                                    expandedClassIndex =
+                                        if (expanded) index else null
+                                }
+                            ) {
+                                OutlinedTextField(
+                                    value = entry.className,
+                                    onValueChange = {},
+                                    label = { Text("Class") },
+                                    readOnly = true,
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(
+                                            expanded =
+                                                expandedClassIndex == index
+                                        )
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .menuAnchor()
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = expandedClassIndex == index,
+                                    onDismissRequest = {
+                                        expandedClassIndex = null
+                                    }
+                                ) {
+                                    classOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option) },
+                                            onClick = {
+                                                AppSettings
+                                                    .classFeeEntries[index] =
+                                                    entry.copy(
+                                                        className = option
+                                                    )
+                                                AppSettings.save(context)
+                                                expandedClassIndex = null
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    AppSettings.classFeeEntries.removeAt(index)
+                                    AppSettings.save(context)
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Remove"
+                                )
+                            }
+                        }
+
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = entry.amountText,
+                            onValueChange = { newValue ->
+                                AppSettings.classFeeEntries[index] =
+                                    entry.copy(amountText = newValue)
+                                AppSettings.save(context)
+                            },
+                            label = { Text("Monthly fee") },
+                            prefix = {
+                                Text(AppSettings.currencySymbol.value)
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(
+                    modifier = Modifier.height(8.dp)
                 )
-                AppSettings.save(context)
             }
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null
-            )
-            Spacer(
-                modifier = Modifier.width(6.dp)
-            )
-            Text("Add class fee")
+
+            FilledTonalButton(
+                onClick = {
+                    AppSettings.classFeeEntries.add(
+                        ClassFeeEntry(className = "", amountText = "")
+                    )
+                    AppSettings.save(context)
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null
+                )
+                Spacer(
+                    modifier = Modifier.width(6.dp)
+                )
+                Text("Add class fee")
+            }
         }
 
         Spacer(

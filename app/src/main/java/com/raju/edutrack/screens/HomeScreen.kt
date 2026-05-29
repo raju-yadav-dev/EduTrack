@@ -37,8 +37,13 @@ fun HomeScreen(navController: NavController) {
 
         val pendingCount = students.count { student ->
             val monthlyFee =
-                student.feeDueAmount
-                    ?: AppSettings.parseClassFeeAmount(student.className)
+                student.feeDueAmount ?: if (
+                    AppSettings.autoClassFeesEnabled.value
+                ) {
+                    AppSettings.parseClassFeeAmount(student.className)
+                } else {
+                    null
+                }
             effectiveMonthsUnpaid(
                 student = student,
                 countFeeFromJoinDate =
