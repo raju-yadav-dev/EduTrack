@@ -1,5 +1,6 @@
 package com.raju.edutrack.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +19,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Message
@@ -45,6 +48,7 @@ import com.raju.edutrack.StudentManager
 import com.raju.edutrack.effectiveMonthsUnpaid
 import com.raju.edutrack.formatDate
 import com.raju.edutrack.isFeePending
+import com.raju.edutrack.matchesStudentQuery
 import com.raju.edutrack.parseDateOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +71,20 @@ fun StudentsScreen() {
     var isGridView by remember {
         mutableStateOf(false)
     }
+
+    var showFilters by remember {
+        mutableStateOf(false)
+    }
+
+    var listByField by remember {
+        mutableStateOf("")
+    }
+
+    var listByValue by remember {
+        mutableStateOf("")
+    }
+
+    val listByFieldOptions = listOf("School", "Class", "Batch")
 
     var showDialog by remember {
         mutableStateOf(false)
@@ -108,6 +126,10 @@ fun StudentsScreen() {
         mutableStateOf(formatDate(System.currentTimeMillis()))
     }
 
+    var showDatePicker by remember {
+        mutableStateOf(false)
+    }
+
     var feeDueAmountText by remember {
         mutableStateOf("")
     }
@@ -117,12 +139,30 @@ fun StudentsScreen() {
     }
 
     val contactEntries = remember {
-        mutableStateListOf(ContactEntry(label = "Main", number = ""))
+        mutableStateListOf(ContactEntry(label = "Own", number = ""))
     }
 
     val normalizedSearch = searchText.trim()
 
     val classOptions = AppSettings.getClassOptions()
+    val batchFilterOptions by remember {
+        derivedStateOf {
+            StudentManager.students
+                .mapNotNull { student -> student.batchName?.trim() }
+                .filter { value -> value.isNotBlank() }
+                .distinctBy { value -> value.lowercase() }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+        }
+    }
+    val schoolFilterOptions by remember {
+        derivedStateOf {
+            StudentManager.students
+                .map { student -> student.schoolName.trim() }
+                .filter { value -> value.isNotBlank() }
+                .distinctBy { value -> value.lowercase() }
+                .sortedWith(String.CASE_INSENSITIVE_ORDER)
+        }
+    }
 
     fun resetForm() {
         studentName = ""
@@ -135,7 +175,7 @@ fun StudentsScreen() {
         contactEntries.clear()
         contactEntries.add(
             ContactEntry(
-                label = "Main",
+                label = "Own",
                 number = ""
             )
         )
@@ -154,17 +194,17 @@ fun StudentsScreen() {
         if (student.contacts.isEmpty()) {
             contactEntries.add(
                 ContactEntry(
-                    label = "Main",
+                    label = "Own",
                     number = ""
                 )
             )
         } else {
             contactEntries.addAll(
                 student.contacts.map { contact ->
-                    val label = contact.label.ifBlank { "Main" }
+                    val label = contact.label.ifBlank { "Own" }
                     ContactEntry(
-                        label = if (label.equals("Primary", true)) {
-                            "Main"
+                        label = if (label.equals("Primary", true) || label.equals("Main", true)) {
+                            "Own"
                         } else {
                             label
                         },
@@ -175,29 +215,80 @@ fun StudentsScreen() {
         }
     }
 
-    val studentsWithIndex = StudentManager.students
-        .withIndex()
-        .filter { entry ->
-
-        normalizedSearch.isEmpty() ||
-            entry.value.studentName.contains(
-                normalizedSearch,
-                ignoreCase = true
-            ) ||
-            entry.value.className.contains(
-                normalizedSearch,
-                ignoreCase = true
-            ) ||
-            entry.value.schoolName.contains(
-                normalizedSearch,
-                ignoreCase = true
-            ) ||
-            entry.value.contacts.any { contactEntry ->
-                contactEntry.number.contains(
-                    normalizedSearch,
-                    ignoreCase = true
-                )
+    val listByValueOptions by remember(
+        listByField,
+        batchFilterOptions,
+        classOptions,
+        schoolFilterOptions
+    ) {
+        derivedStateOf {
+            when (listByField) {
+                "School" -> schoolFilterOptions
+                "Class" -> classOptions
+                "Batch" -> batchFilterOptions
+                else -> emptyList()
             }
+        }
+    }
+
+    val studentsWithIndex by remember(
+        normalizedSearch,
+        listByField,
+        listByValue
+    ) {
+        derivedStateOf {
+            StudentManager.students
+                .withIndex()
+                .filter { entry ->
+                    val student = entry.value
+                    val listByMatches = if (listByValue.isBlank()) {
+                        true
+                    } else {
+                        when (listByField) {
+                            "School" -> listByValue.matchesOptional(student.schoolName)
+                            "Class" -> listByValue.matchesOptional(student.className)
+                            "Batch" -> listByValue.matchesOptional(student.batchName.orEmpty())
+                            else -> true
+                        }
+                    }
+                    student.matchesStudentQuery(normalizedSearch) && listByMatches
+                }
+        }
+    }
+
+    BackHandler(enabled = searchText.isNotBlank()) {
+        searchText = ""
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = parseDateOrNull(joinDateText) ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val formatter = java.text.SimpleDateFormat("dd-MM-yyyy", java.util.Locale.getDefault()).apply {
+                                timeZone = java.util.TimeZone.getTimeZone("UTC")
+                            }
+                            joinDateText = formatter.format(millis)
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 
     if (showDialog || showEditDialog) {
@@ -222,7 +313,7 @@ fun StudentsScreen() {
                             .map { entry ->
                                 Contact(
                                     label = entry.label.trim()
-                                        .ifBlank { "Main" },
+                                        .ifBlank { "Own" },
                                     number = entry.number.trim()
                                 )
                             }
@@ -489,6 +580,16 @@ fun StudentsScreen() {
 
                             }
 
+                            DropdownMenuItem(
+                                text = {
+                                    Text("Custom")
+                                },
+                                onClick = {
+                                    batchName = ""
+                                    isBatchMenuExpanded = false
+                                }
+                            )
+
                         }
 
                     }
@@ -579,7 +680,6 @@ fun StudentsScreen() {
                         }
 
                     }
-
                     Spacer(
                         modifier = Modifier.height(8.dp)
                     )
@@ -620,6 +720,19 @@ fun StudentsScreen() {
 
                             Text("Joining Date (dd-MM-yyyy)")
 
+                        },
+
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    showDatePicker = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Select Date"
+                                )
+                            }
                         },
 
                         singleLine = true
@@ -679,7 +792,7 @@ fun StudentsScreen() {
                         ) {
 
                             val defaultLabels = listOf(
-                                "Main",
+                                "Own",
                                 "Guardian",
                                 "Father",
                                 "Mother"
@@ -807,7 +920,7 @@ fun StudentsScreen() {
                                     horizontalArrangement = Arrangement.End
                                 ) {
 
-                                    IconButton(
+                                    OutlinedIconButton(
 
                                         onClick = {
 
@@ -819,7 +932,7 @@ fun StudentsScreen() {
 
                                         Icon(
                                             imageVector = Icons.Default.Delete,
-                                            contentDescription = null
+                                            contentDescription = "Remove contact"
                                         )
 
                                     }
@@ -1048,6 +1161,27 @@ fun StudentsScreen() {
 
                     onClick = {
 
+                        showFilters = !showFilters
+
+                    },
+
+                    modifier = Modifier.size(56.dp)
+
+                ) {
+
+                    Icon(
+
+                        imageVector = Icons.Default.FilterList,
+
+                        contentDescription = "List filters"
+
+                    )
+                }
+
+                FilledTonalIconButton(
+
+                    onClick = {
+
                         isGridView = !isGridView
 
                     },
@@ -1067,6 +1201,30 @@ fun StudentsScreen() {
 
                     )
                 }
+            }
+
+            if (showFilters) {
+                Spacer(
+                    modifier = Modifier.height(10.dp)
+                )
+
+                StudentFilterPanel(
+                    listByField = listByField,
+                    listByValue = listByValue,
+                    fieldOptions = listByFieldOptions,
+                    valueOptions = listByValueOptions,
+                    onListByFieldChange = { field ->
+                        listByField = field
+                        listByValue = ""
+                    },
+                    onListByValueChange = { value ->
+                        listByValue = value
+                    },
+                    onClearFilters = {
+                        listByField = ""
+                        listByValue = ""
+                    }
+                )
             }
 
             Spacer(
@@ -1089,19 +1247,21 @@ fun StudentsScreen() {
 
                     items(
                         items = studentsWithIndex,
-                        key = { entry -> entry.index }
+                        key = { entry -> entry.value.id }
                     ) { entry ->
 
                         val student = entry.value
                         val isSelected =
                             selectedStudentIndexes
                                 .contains(entry.index)
+                        val primaryNumber = student.contacts.primaryNumber()
 
                         StudentGridCard(
                             studentName = student.studentName,
                             className = student.className,
                             schoolName = student.schoolName,
                             batchName = student.batchName,
+                            primaryNumber = primaryNumber,
                             lastFeePaidMillis =
                                 student.lastFeePaidMillis,
                             isSelected = isSelected,
@@ -1142,36 +1302,14 @@ fun StudentsScreen() {
 
                     items(
                         items = studentsWithIndex,
-                        key = { entry -> entry.index }
+                        key = { entry -> entry.value.id }
                     ) { entry ->
 
                         val student = entry.value
                         val isSelected =
                             selectedStudentIndexes
                                 .contains(entry.index)
-                        val primaryNumber =
-                            student.contacts
-                                .firstOrNull { contact ->
-                                    contact.label.equals(
-                                        "Main",
-                                        ignoreCase = true
-                                    ) && contact.number.isNotBlank()
-                                }
-                                ?.number
-                                ?: student.contacts
-                                    .firstOrNull { contact ->
-                                        contact.label.equals(
-                                            "Primary",
-                                            ignoreCase = true
-                                        ) && contact.number.isNotBlank()
-                                    }
-                                    ?.number
-                                ?: student.contacts
-                                    .firstOrNull { contact ->
-                                        contact.number.isNotBlank()
-                                    }
-                                    ?.number
-                                ?: ""
+                        val primaryNumber = student.contacts.primaryNumber()
                         val monthlyFee =
                             student.feeDueAmount ?: if (
                                 AppSettings.autoClassFeesEnabled.value
@@ -1352,11 +1490,11 @@ fun StudentListCard(
                     horizontalAlignment = Alignment.End
                 ) {
                     Text(
-                        text = className,
+                        text = "Class: $className",
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 96.dp)
+                        modifier = Modifier.widthIn(max = 120.dp)
                     )
 
                     Spacer(
@@ -1470,6 +1608,7 @@ fun StudentGridCard(
     className: String,
     schoolName: String,
     batchName: String?,
+    primaryNumber: String,
     lastFeePaidMillis: Long?,
     isSelected: Boolean,
     modifier: Modifier = Modifier
@@ -1479,7 +1618,7 @@ fun StudentGridCard(
 
         modifier = modifier
             .fillMaxWidth()
-            .height(170.dp)
+            .height(210.dp)
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -1525,7 +1664,7 @@ fun StudentGridCard(
                 )
 
                 Text(
-                    text = className,
+                    text = "Class: $className",
                     style =
                         MaterialTheme.typography.bodyMedium
                 )
@@ -1547,6 +1686,19 @@ fun StudentGridCard(
                     batchName?.takeIf { it.isNotBlank() } ?: "-"
                 Text(
                     text = "Batch: $batchLabel",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Spacer(
+                    modifier = Modifier.height(4.dp)
+                )
+
+                Text(
+                    text = if (primaryNumber.isNotBlank()) {
+                        "Own: $primaryNumber"
+                    } else {
+                        "Own: -"
+                    },
                     style = MaterialTheme.typography.bodySmall
                 )
 
@@ -1584,3 +1736,132 @@ private data class ContactEntry(
     val label: String,
     val number: String
 )
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StudentFilterPanel(
+    listByField: String,
+    listByValue: String,
+    fieldOptions: List<String>,
+    valueOptions: List<String>,
+    onListByFieldChange: (String) -> Unit,
+    onListByValueChange: (String) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    var expandedFilter by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterDropdown(
+                label = "Group",
+                value = listByField,
+                options = fieldOptions,
+                allLabel = "None",
+                expanded = expandedFilter == "field",
+                onExpandedChange = { expanded ->
+                    expandedFilter = if (expanded) "field" else null
+                },
+                onSelected = { value ->
+                    onListByFieldChange(value)
+                    expandedFilter = null
+                },
+                modifier = Modifier.weight(1f)
+            )
+            FilterDropdown(
+                label = listByField.ifBlank { "Value" },
+                value = listByValue,
+                options = valueOptions,
+                enabled = listByField.isNotBlank(),
+                expanded = expandedFilter == "value",
+                onExpandedChange = { expanded ->
+                    expandedFilter = if (expanded) "value" else null
+                },
+                onSelected = { value ->
+                    onListByValueChange(value)
+                    expandedFilter = null
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        TextButton(
+            onClick = onClearFilters,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("Clear")
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterDropdown(
+    label: String,
+    value: String,
+    options: List<String>,
+    allLabel: String = "All",
+    enabled: Boolean = true,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = value.ifBlank { "All" },
+            onValueChange = {},
+            label = { Text(label) },
+            enabled = enabled,
+            readOnly = true,
+            singleLine = true,
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) }
+        ) {
+            DropdownMenuItem(
+                text = { Text(allLabel) },
+                onClick = { onSelected("") }
+            )
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = { onSelected(option) }
+                )
+            }
+        }
+    }
+}
+
+private fun String.matchesOptional(value: String): Boolean {
+    return isBlank() || value.equals(this, ignoreCase = true)
+}
+
+private fun List<Contact>.primaryNumber(): String {
+    return firstOrNull { contact ->
+        contact.label.equals("Own", ignoreCase = true) &&
+            contact.number.isNotBlank()
+    }?.number
+        ?: firstOrNull { contact ->
+            contact.label.equals("Primary", ignoreCase = true) &&
+                contact.number.isNotBlank()
+        }?.number
+        ?: firstOrNull { contact -> contact.number.isNotBlank() }?.number
+        ?: ""
+}

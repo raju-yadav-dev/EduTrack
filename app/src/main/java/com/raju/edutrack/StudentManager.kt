@@ -29,12 +29,32 @@ object StudentManager {
     fun updateStudent(
         context: Context,
         index: Int,
-        student: Student
+        student: Student,
+        recordPaymentHistory: Boolean = true
     ) {
         if (index in students.indices) {
             students[index] = student
             persist(context)
         }
+    }
+
+    fun updateStudents(
+        context: Context,
+        transform: (Student) -> Student
+    ): Int {
+        var updatedCount = 0
+        students.indices.forEach { index ->
+            val current = students[index]
+            val updated = transform(current)
+            if (updated != current) {
+                students[index] = updated
+                updatedCount++
+            }
+        }
+        if (updatedCount > 0) {
+            persist(context)
+        }
+        return updatedCount
     }
 
     fun removeStudents(

@@ -19,6 +19,7 @@ class MainActivity : ComponentActivity() {
         StudentManager.load(this)
         AppSettings.load(this)
         BatchManager.load(this)
+        PaymentHistoryManager.load(this)
 
         lifecycleScope.launch {
             when (val result = UpdateManager.checkForUpdate(this@MainActivity)) {

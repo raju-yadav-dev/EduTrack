@@ -80,10 +80,9 @@ object BatchManager {
         if (mode == AutoBatchMode.NONE) {
             return
         }
-        StudentManager.students.withIndex()
-            .filter { entry -> entry.value.batchName.isNullOrBlank() }
-            .forEach { entry ->
-                val student = entry.value
+        val generatedBatchNames = linkedSetOf<String>()
+        StudentManager.updateStudents(context) { student ->
+            if (student.batchName.isNullOrBlank()) {
                 val className = student.className.trim()
                 val schoolName = student.schoolName.trim()
                 val autoBatchName = when (mode) {
@@ -98,14 +97,25 @@ object BatchManager {
                     AutoBatchMode.NONE -> ""
                 }
                 if (autoBatchName.isNotBlank()) {
-                    StudentManager.updateStudent(
-                        context,
-                        entry.index,
-                        student.copy(batchName = autoBatchName)
-                    )
-                    ensureBatch(context, autoBatchName)
+                    generatedBatchNames.add(autoBatchName)
+                    student.copy(batchName = autoBatchName)
+                } else {
+                    student
                 }
+            } else {
+                student
             }
+        }
+        var addedBatch = false
+        generatedBatchNames.forEach { name ->
+            if (batches.none { batch -> batch.name.equals(name, ignoreCase = true) }) {
+                batches.add(Batch(name))
+                addedBatch = true
+            }
+        }
+        if (addedBatch) {
+            persist(context)
+        }
     }
 
     private fun persist(context: Context) {

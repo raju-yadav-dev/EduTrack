@@ -1,5 +1,7 @@
 package com.raju.edutrack
 
+import java.util.UUID
+
 data class Student(
     val studentName: String,
     val className: String,
@@ -11,4 +13,5 @@ data class Student(
     val feeDueAmount: Double? = null,
     val feeDueDateMillis: Long? = null,
     val advanceBalance: Double? = null,
+    val id: String = UUID.randomUUID().toString()
 )

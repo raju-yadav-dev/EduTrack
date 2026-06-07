@@ -35,7 +35,6 @@ object BatchStorage {
                 )
             }
         }
-
         return batches
     }
 
@@ -53,6 +52,15 @@ object BatchStorage {
         }
 
         val file = File(context.filesDir, BATCHES_FILE_NAME)
-        file.writeText(array.toString())
+        file.writeAtomically(array.toString())
+    }
+}
+
+private fun File.writeAtomically(text: String) {
+    val tempFile = File(parentFile, "$name.tmp")
+    tempFile.writeText(text)
+    if (!tempFile.renameTo(this)) {
+        tempFile.copyTo(this, overwrite = true)
+        tempFile.delete()
     }
 }

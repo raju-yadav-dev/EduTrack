@@ -38,6 +38,7 @@ object AppSettings {
     val defaultBatchName = mutableStateOf("")
     val autoAdvanceFeeDueDate = mutableStateOf(true)
     val autoClassFeesEnabled = mutableStateOf(false)
+    val confirmFullFeePaid = mutableStateOf(true)
     val feePaymentMessagesEnabled = mutableStateOf(false)
     val batchReminderMessagesEnabled = mutableStateOf(false)
     val messageChannel = mutableStateOf(MessageChannel.SMS)
@@ -100,6 +101,8 @@ object AppSettings {
             prefs.getBoolean("autoAdvanceFeeDueDate", true)
         autoClassFeesEnabled.value =
             prefs.getBoolean("autoClassFeesEnabled", false)
+        confirmFullFeePaid.value =
+            prefs.getBoolean("confirmFullFeePaid", true)
         feePaymentMessagesEnabled.value =
             prefs.getBoolean("feePaymentMessagesEnabled", false)
         batchReminderMessagesEnabled.value =
@@ -211,6 +214,10 @@ object AppSettings {
             .putBoolean(
                 "autoClassFeesEnabled",
                 autoClassFeesEnabled.value
+            )
+            .putBoolean(
+                "confirmFullFeePaid",
+                confirmFullFeePaid.value
             )
             .putBoolean(
                 "feePaymentMessagesEnabled",

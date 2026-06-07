@@ -74,11 +74,12 @@ object StudentStorage {
                     joinDateMillis =
                         item.optLong("joinDateMillis"),
                     lastFeePaidMillis = lastPaidMillis,
-                    batchName = item
-                        .optString("batchName", null),
+                    batchName = item.optionalString("batchName"),
                     feeDueAmount = feeDueAmount,
                     feeDueDateMillis = feeDueDateMillis,
-                    advanceBalance = advanceBalance
+                    advanceBalance = advanceBalance,
+                    id = item.optionalString("id")
+                        ?: legacyStudentId(item, index)
                 )
             )
         }
@@ -97,6 +98,7 @@ object StudentStorage {
         val array = JSONArray()
         students.forEach { student ->
             val item = JSONObject()
+            item.put("id", student.id)
             item.put("studentName", student.studentName)
             item.put("className", student.className)
             item.put("schoolName", student.schoolName)
@@ -137,6 +139,32 @@ object StudentStorage {
         }
 
         val file = File(context.filesDir, STUDENTS_FILE_NAME)
-        file.writeText(array.toString())
+        file.writeAtomically(array.toString())
+    }
+}
+
+private fun JSONObject.optionalString(name: String): String? =
+    optString(name).takeIf { value -> value.isNotBlank() }
+
+private fun legacyStudentId(
+    item: JSONObject,
+    index: Int
+): String {
+    val seed = listOf(
+        item.optString("studentName"),
+        item.optString("className"),
+        item.optString("schoolName"),
+        item.optLong("joinDateMillis", 0L).toString(),
+        index.toString()
+    ).joinToString(separator = "|")
+    return seed.hashCode().toUInt().toString(radix = 16)
+}
+
+private fun File.writeAtomically(text: String) {
+    val tempFile = File(parentFile, "$name.tmp")
+    tempFile.writeText(text)
+    if (!tempFile.renameTo(this)) {
+        tempFile.copyTo(this, overwrite = true)
+        tempFile.delete()
     }
 }

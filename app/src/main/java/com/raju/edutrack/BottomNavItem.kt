@@ -29,7 +29,7 @@ sealed class BottomNavItem(
 
     object Batches : BottomNavItem(
         "batches",
-        "Batches",
+        "Batch",
         Icons.Default.Groups
     )
 
